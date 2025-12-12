@@ -19,6 +19,9 @@ type Config struct {
 
 	DBUrl   string
 	ENVMode string
+
+	AWSRegion   string
+	SQSQueueUrl string
 }
 
 func LoadConfig() *Config {
@@ -38,6 +41,9 @@ func LoadConfig() *Config {
 
 		DBUrl:   getEnv("DB_URL", ""),
 		ENVMode: getEnv("ENV_MODE", "development"),
+
+		AWSRegion:   getEnv("AWS_REGION", "us-east-1"),
+		SQSQueueUrl: getEnv("SQS_QUEUE_URL", "sdsdsdsdsd"),
 	}
 }
 

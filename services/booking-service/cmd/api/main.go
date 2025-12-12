@@ -1,17 +1,23 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"booking-service/internal/config"
 	"booking-service/internal/database"
 	"booking-service/internal/database/seeds"
 	"booking-service/internal/handlers"
+	"booking-service/internal/messaging"
 	"booking-service/internal/repositories"
 	"booking-service/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
+
+type SendMessageReq struct {
+	Message string `json:"message" binding:"required"`
+}
 
 func main() {
 	cfg := config.LoadConfig()
@@ -20,8 +26,6 @@ func main() {
 	if err := seeds.ResetAndSeed(db); err != nil {
 		log.Fatal(err)
 	}
-
-	log.Println("✅ Seed completed")
 
 	// Events
 	eventRepo := repositories.NewEventRepository(db)
@@ -37,6 +41,17 @@ func main() {
 	bookingOrderRepo := repositories.NewBookingOrderRepository(db)
 	bookingOrderService := services.NewBookingOrderService(bookingOrderRepo)
 	bookingOrderHandler := handlers.NewBookingOrderHandler(bookingOrderService)
+
+	// Queue AWS SQS
+	ctx := context.Background()
+	envs := config.LoadConfig()
+
+	sqsClient, err := messaging.NewSQSClient(ctx, envs.AWSRegion, envs.SQSQueueUrl)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sqsHandler := handlers.NewSQSHandler(sqsClient)
 
 	r := gin.Default()
 	v1 := r.Group("/api/v1")
@@ -66,6 +81,10 @@ func main() {
 			bookingOrders.POST("", bookingOrderHandler.CreateBookingOrder)
 			bookingOrders.GET("", bookingOrderHandler.GetBookingOrders)
 			bookingOrders.GET("/:id", bookingOrderHandler.GetBookingOrderById)
+		}
+		sqsMessaging := v1.Group("/sqs")
+		{
+			sqsMessaging.POST("/messaging", sqsHandler.Send)
 		}
 	}
 
