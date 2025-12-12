@@ -22,8 +22,6 @@ const (
 	PaymentFailed    PaymentStatus = "FAILED"
 )
 
-// --- BASE MODEL ---
-// Modelo base con UUID para todos los modelos
 type BaseModel struct {
 	ID        string         `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 	CreatedAt time.Time      `json:"createdAt"`
@@ -31,7 +29,6 @@ type BaseModel struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-// --- EVENTO ---
 type Event struct {
 	BaseModel
 
@@ -58,8 +55,6 @@ type Seat struct {
 	Status SeatStatus `gorm:"type:varchar(20);default:'AVAILABLE'" json:"status"`
 
 	// Control de Bloqueo Temporal
-	// LockedBy *string    `gorm:"type:text" json:"lockedBy,omitempty"` // Quien lo bloquea (uuid)
-	// LockedAt *time.Time `json:"lockedAt,omitempty"`                  // Cuando se desbloquea
 	LockedBy *string    `gorm:"type:text" json:"lockedBy"` // Quien lo bloquea (uuid)
 	LockedAt *time.Time `json:"lockedAt"`                  // Cuando se desbloquea
 
@@ -69,7 +64,6 @@ type Seat struct {
 }
 
 // --- PAGO / ORDEN ---
-// Necesitas esto para traquear quién intenta comprar qué
 type BookingOrder struct {
 	BaseModel
 
