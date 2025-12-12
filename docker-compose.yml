@@ -1,0 +1,66 @@
+# services:
+#   auth-service:
+#     build:
+#       context: ./services/auth-service
+#       dockerfile: Dockerfile
+#       target: development   
+#     container_name: auth-service
+#     restart: unless-stopped
+#     ports:
+#       - "3000:3000"
+#     environment:
+#       - PORT=3000
+#       - DATABASE_URL=${DATABASE_URL}
+#       - MY_FRONTEND_URL=${MY_FRONTEND_URL}
+#       - SECRET_JWT=${SECRET_JWT}
+#     volumes:
+#       - ./services/auth-service:/usr/src/app      
+#       - /usr/src/app/node_modules                 
+#     networks:
+#       - microservices-network
+
+# networks:
+#   microservices-network:
+#     driver: bridge
+
+services:
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+      target: development
+    container_name: auth-service
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./services/auth-service/.env
+    # environment:
+    #   - PORT=3000
+    #   - DATABASE_URL=${DATABASE_URL}
+    #   - MY_FRONTEND_URL=${MY_FRONTEND_URL}
+    #   - SECRET_JWT=${SECRET_JWT}
+    volumes:
+      - ./services/auth-service:/usr/src/app
+      - /usr/src/app/node_modules
+    networks:
+      - microservices-network
+
+  booking-service:
+    build:
+      context: ./services/booking-service
+      dockerfile: Dockerfile
+    container_name: booking-service
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./services/booking-service/.env
+    networks:
+      - microservices-network
+    depends_on:
+      - auth-service
+
+networks:
+  microservices-network:
+    driver: bridge
