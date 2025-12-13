@@ -18,6 +18,6 @@ async function bootstrap() {
 );
 
 console.log(`Listening on port ${envs.port ?? 3000}`);
-await app.listen(envs.port ?? 3000);
+await app.listen(envs.port ?? 3000, "0.0.0.0");
 }
 bootstrap();

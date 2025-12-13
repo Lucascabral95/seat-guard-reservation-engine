@@ -22,6 +22,8 @@ type Config struct {
 
 	AWSRegion   string
 	SQSQueueUrl string
+
+	StripeSecretKey string
 }
 
 func LoadConfig() *Config {
@@ -44,6 +46,8 @@ func LoadConfig() *Config {
 
 		AWSRegion:   getEnv("AWS_REGION", "us-east-1"),
 		SQSQueueUrl: getEnv("SQS_QUEUE_URL", "sdsdsdsdsd"),
+
+		StripeSecretKey: getEnv("STRIPE_SECRET_KEY", "sk_test_XXXXXXXXXXXXXXXXXXXX"),
 	}
 }
 
