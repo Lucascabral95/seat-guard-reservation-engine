@@ -9,7 +9,6 @@ import (
 	"booking-service/internal/database"
 	"booking-service/internal/database/seeds"
 
-	// "booking-service/internal/database/seeds"
 	"booking-service/internal/handlers"
 	"booking-service/internal/messaging"
 	"booking-service/internal/repositories"
@@ -101,7 +100,8 @@ func main() {
 		// Creacion de checkout session
 		stripe := v1.Group("/stripe")
 		{
-			stripe.POST("/create/checkout/session", handlers.CreateCartCheckoutSession)
+			//	stripe.POST("/create/checkout/session", handlers.CreateCartCheckoutSession)
+			stripe.POST("/create/checkout/session", handlers.CreateCartCheckoutSession(seatService))
 		}
 	}
 
