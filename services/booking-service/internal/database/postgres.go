@@ -33,5 +33,12 @@ func InitDB(cfg *config.Config) *gorm.DB {
 	}
 	log.Println("✅ Migrations completed")
 
+	// AGREGADO: VACIAR BOOKING_ORDERS
+	if err := db.Exec("TRUNCATE TABLE booking_orders CASCADE").Error; err != nil {
+		log.Printf("⚠️ Warning: Could not truncate booking_orders: %v", err)
+	} else {
+		log.Println("🧹 BookingOrder table cleared")
+	}
+
 	return db
 }

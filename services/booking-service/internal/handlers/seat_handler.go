@@ -3,6 +3,8 @@ package handlers
 import (
 	"booking-service/internal/models"
 	"booking-service/internal/services"
+	"booking-service/pkg/utils"
+	"errors"
 	"net/http"
 	"time"
 
@@ -50,15 +52,14 @@ func (h *SeatHandler) GetSeats(c *gin.Context) {
 func (h *SeatHandler) GetSeat(c *gin.Context) {
 	id := c.Param("id")
 
-	_, err := uuid.Parse(id)
-	if err != nil {
+	if _, err := uuid.Parse(id); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid UUID format"})
 		return
 	}
 
 	seat, err := h.service.GetSeat(id)
 	if err != nil {
-		if err.Error() == "seat not found" {
+		if errors.Is(err, utils.ErrSeatNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Seat not found"})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch seat"})
@@ -88,6 +89,7 @@ func (h *SeatHandler) GetSeatsByEventId(c *gin.Context) {
 	c.JSON(http.StatusOK, seat)
 }
 
+// PATCH /seats/:id
 func (h *SeatHandler) UpdateSeat(c *gin.Context) {
 	id := c.Param("id")
 	var seat models.Seat
@@ -98,7 +100,7 @@ func (h *SeatHandler) UpdateSeat(c *gin.Context) {
 	}
 
 	if err := h.service.UpdateSeatStatus(id, seat.Status); err != nil {
-		if err.Error() == "cannot update: seat not found" {
+		if errors.Is(err, utils.ErrSeatNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Seat not found"})
 		} else {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update seat"})
@@ -109,8 +111,6 @@ func (h *SeatHandler) UpdateSeat(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Seat updated successfully"})
 }
 
-// Bloquear por 15 minutos. Requisitos: recibir uid y id del asiento
-// Bloquear por 15 minutos. Requisitos: recibir uid y id del asiento
 // Bloquear por 15 minutos. Requisitos: recibir uid y id del asiento
 func (h *SeatHandler) LockSeat(c *gin.Context) {
 	id := c.Param("id")

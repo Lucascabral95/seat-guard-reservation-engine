@@ -51,7 +51,7 @@ func (r *seatRepository) UpdateStatus(id string, status models.SeatStatus) error
 	}
 
 	if result.RowsAffected == 0 {
-		return errors.New("seat not found")
+		return gorm.ErrRecordNotFound
 	}
 
 	return nil

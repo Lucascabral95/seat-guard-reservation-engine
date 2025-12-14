@@ -2,6 +2,7 @@
   "scripts": {
     "auth:run": "cd services/auth-service && nest start --watch",
     "go:run": "cd services/booking-service && go run cmd/api/main.go",
+    "go:seed": "cd services/booking-service && go run cmd/api/main.go -seed",
 
     "deploy:fargate": "cd infra/terraform && terraform apply -auto-approve",
     "destroy:fargate": "cd infra/terraform && terraform destroy -auto-approve",
@@ -11,6 +12,7 @@
     
     "docker:compose": "docker-compose up -d --build", 
     "docker:push": "bash scripts/deploy-images.sh",
+    "docker:all": "npm run docker:compose && npm run docker:push",
 
     "deploy:all": "npm run deploy:fargate && npm run deploy:lambda",
     "destroy:all": "npm run destroy:fargate && npm run destroy:lambda"

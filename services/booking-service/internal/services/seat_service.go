@@ -3,8 +3,11 @@ package services
 import (
 	"booking-service/internal/models"
 	"booking-service/internal/repositories"
+	"booking-service/pkg/utils"
 	"errors"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type SeatService struct {
@@ -34,6 +37,9 @@ func (s *SeatService) GetSeat(id string) (*models.Seat, error) {
 
 	seat, err := s.repo.FindByID(id)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.ErrSeatNotFound
+		}
 		return nil, err
 	}
 
@@ -45,7 +51,14 @@ func (s *SeatService) UpdateSeatStatus(id string, status models.SeatStatus) erro
 		return errors.New("invalid seat status")
 	}
 
-	return s.repo.UpdateStatus(id, status)
+	err := s.repo.UpdateStatus(id, status)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.ErrSeatNotFound
+		}
+	}
+
+	return nil
 }
 
 func (s *SeatService) GetSeatByEventId(eventId string) ([]models.Seat, error) {

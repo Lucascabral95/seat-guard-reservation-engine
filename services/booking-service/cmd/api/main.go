@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 
 	"booking-service/internal/config"
 	"booking-service/internal/database"
 	"booking-service/internal/database/seeds"
+
+	// "booking-service/internal/database/seeds"
 	"booking-service/internal/handlers"
 	"booking-service/internal/messaging"
 	"booking-service/internal/repositories"
@@ -20,11 +23,20 @@ type SendMessageReq struct {
 }
 
 func main() {
+	runSeed := flag.Bool("seed", false, "Run database seeding")
+	flag.Parse()
+
 	cfg := config.LoadConfig()
 	db := database.InitDB(cfg)
 
-	if err := seeds.ResetAndSeed(db); err != nil {
-		log.Fatal(err)
+	// Si pongo "-seed", corro la semilla
+	if *runSeed {
+		log.Println("Ejecutando Semilla (Reset & Seed)...")
+		if err := seeds.ResetAndSeed(db); err != nil {
+			log.Fatal("Error seeding database", err)
+		}
+		log.Println("Database seeded successfully!")
+		return
 	}
 
 	// Events
