@@ -53,8 +53,6 @@ func main() {
 
 	sqsHandler := handlers.NewSQSHandler(sqsClient)
 
-	stripeHandler := handlers.CreateCartCheckoutSession
-
 	r := gin.Default()
 	v1 := r.Group("/api/v1")
 	{
@@ -91,7 +89,7 @@ func main() {
 		// Creacion de checkout session
 		stripe := v1.Group("/stripe")
 		{
-			stripe.POST("/create/checkout/session", stripeHandler)
+			stripe.POST("/create/checkout/session", handlers.CreateCartCheckoutSession)
 		}
 	}
 

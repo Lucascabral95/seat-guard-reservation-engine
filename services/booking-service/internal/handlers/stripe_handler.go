@@ -10,10 +10,14 @@ import (
 	checkoutsession "github.com/stripe/stripe-go/v76/checkout/session"
 )
 
+type SeatStruc struct {
+	Id string `json:"id"`
+}
+
 type TicketItem struct {
-	Name    string   `json:"name"`
-	Amount  int64    `json:"amount"`
-	SeatIds []string `json:"seatIds"`
+	Name    string    `json:"name"`
+	Amount  int64     `json:"amount"`
+	SeatIds SeatStruc `json:"seatIds"`
 }
 
 type CreateCartCheckoutReq struct {
@@ -27,7 +31,7 @@ func CreateCartCheckoutSession(c *gin.Context) {
 
 	var body CreateCartCheckoutReq
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body: " + err.Error()})
 		return
 	}
 
@@ -37,8 +41,11 @@ func CreateCartCheckoutSession(c *gin.Context) {
 	}
 
 	currency := strings.ToLower(strings.TrimSpace(body.Currency))
-	var lineItems []*stripe.CheckoutSessionLineItemParams
+	if currency == "" {
+		currency = "usd"
+	}
 
+	var lineItems []*stripe.CheckoutSessionLineItemParams
 	var allSeatIds []string
 
 	for _, item := range body.Items {
@@ -53,7 +60,9 @@ func CreateCartCheckoutSession(c *gin.Context) {
 			Quantity: stripe.Int64(1),
 		})
 
-		allSeatIds = append(allSeatIds, item.SeatIds...)
+		if item.SeatIds.Id != "" {
+			allSeatIds = append(allSeatIds, item.SeatIds.Id)
+		}
 	}
 
 	seatsMetadata := strings.Join(allSeatIds, ",")

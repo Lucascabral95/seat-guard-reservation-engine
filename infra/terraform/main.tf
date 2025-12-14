@@ -19,7 +19,7 @@ resource "aws_cloudwatch_log_group" "booking_logs" {
   retention_in_days = 7
 }
 
-# 2. RED (VPC)
+# 2. RED (VPC) - MODIFICADO PARA SEGURIDAD DE COSTOS
 module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
   name   = "${local.app_name}-vpc"
@@ -28,6 +28,11 @@ module "vpc" {
   azs            = ["us-east-1a", "us-east-1b"]
   public_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
   
+  # --- ESTAS LINEAS SON CLAVE PARA TU BOLSILLO ---
+  enable_nat_gateway = false
+  single_nat_gateway = false
+  # -----------------------------------------------
+
   enable_dns_hostnames = true
   enable_dns_support   = true
 }
@@ -85,7 +90,7 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
 
 # 5. TAREAS Y SERVICIOS
 
-# --- TAREA 1: AUTH SERVICE (Puerto 3000) (en Fargate escuchara en el puerto 80 (por defecto, no se debera poner ningun :puerto))---
+# --- TAREA 1: AUTH SERVICE ---
 resource "aws_ecs_task_definition" "auth" {
   family                   = "auth-service-task"
   network_mode             = "awsvpc"
@@ -105,7 +110,7 @@ resource "aws_ecs_task_definition" "auth" {
   
     environment = [
       for key, value in var.auth_service_envs : {
-        name = key 
+        name  = key 
         value = value
       }
     ]
@@ -130,7 +135,7 @@ resource "aws_ecs_service" "auth" {
   network_configuration {
     subnets          = module.vpc.public_subnets
     security_groups  = [aws_security_group.ecs_tasks_sg.id]
-    assign_public_ip = true
+    assign_public_ip = true # Esto permite salir a internet sin NAT
   }
 
   capacity_provider_strategy {
@@ -145,7 +150,7 @@ resource "aws_ecs_service" "auth" {
   }
 }
 
-# --- TAREA 2: BOOKING SERVICE (Puerto 4000) ---
+# --- TAREA 2: BOOKING SERVICE ---
 resource "aws_ecs_task_definition" "booking" {
   family                   = "booking-service-task"
   network_mode             = "awsvpc"
@@ -165,7 +170,7 @@ resource "aws_ecs_task_definition" "booking" {
 
     environment = [
       for key, value in var.booking_service_envs : {
-        name = key
+        name  = key
         value = value
       }
     ]
@@ -190,7 +195,7 @@ resource "aws_ecs_service" "booking" {
   network_configuration {
     subnets          = module.vpc.public_subnets
     security_groups  = [aws_security_group.ecs_tasks_sg.id]
-    assign_public_ip = true
+    assign_public_ip = true # Esto permite salir a internet sin NAT
   }
 
   capacity_provider_strategy {
@@ -205,9 +210,9 @@ resource "aws_ecs_service" "booking" {
   }
 }
 
-# 6. ROUTING (Estrategia Multi-Puerto)
+# 6. ROUTING
 
-# Target Group para Auth (Puerto 3000)
+# Target Group para Auth
 resource "aws_lb_target_group" "auth" {
   name_prefix = "auth-"  
   port        = 3000
@@ -216,14 +221,14 @@ resource "aws_lb_target_group" "auth" {
   target_type = "ip"
   
   health_check {
-    path = "/health"
+    path    = "/health"
     matcher = "200-299"
   }
 
   lifecycle { create_before_destroy = true }
 }
 
-# Target Group para Booking (Puerto 4000)
+# Target Group para Booking
 resource "aws_lb_target_group" "booking" {
   name_prefix = "book-" 
   port        = 4000
@@ -232,14 +237,14 @@ resource "aws_lb_target_group" "booking" {
   target_type = "ip"
   
   health_check {
-    path = "/api/v1/events" 
+    path    = "/api/v1/events" 
     matcher = "200-299"
   }
 
   lifecycle { create_before_destroy = true }
 }
 
-# --- LISTENER 1: Puerto 80 -> Va directo a AUTH ---
+# Listeners
 resource "aws_lb_listener" "http_auth" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
@@ -251,7 +256,6 @@ resource "aws_lb_listener" "http_auth" {
   }
 }
 
-# --- LISTENER 2: Puerto 8080 -> Va directo a BOOKING ---
 resource "aws_lb_listener" "http_booking" {
   load_balancer_arn = aws_lb.main.arn
   port              = 8080

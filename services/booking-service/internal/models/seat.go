@@ -72,7 +72,8 @@ type BookingOrder struct {
 	Status PaymentStatus `gorm:"default:'PENDING'" json:"status"`
 
 	// Asientos involucrados en esta orden
-	SeatIDs []string `gorm:"type:text[]" json:"seatIds"`
+	//SeatIDs []string `gorm:"type:text[]" json:"seatIds"`
+	SeatIDs []string `gorm:"serializer:json" json:"seatIds"`
 
 	// Token o ID de transacción de la pasarela de pago (Stripe/MercadoPago)
 	PaymentProviderID string `json:"paymentProviderId,omitempty"`
