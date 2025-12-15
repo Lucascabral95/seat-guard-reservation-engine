@@ -28,7 +28,7 @@ func main() {
 	cfg := config.LoadConfig()
 	db := database.InitDB(cfg)
 
-	// Si pongo "-seed", corro la semilla
+	// Si pongo "-seed", ejecuto la semilla
 	if *runSeed {
 		log.Println("Ejecutando Semilla (Reset & Seed)...")
 		if err := seeds.ResetAndSeed(db); err != nil {
@@ -74,6 +74,8 @@ func main() {
 			events.GET("", eventHandler.GetAllEvents)
 			events.GET("/:id", eventHandler.GetEventByID)
 			events.PATCH("/:id", eventHandler.UpdateEvent)
+			// Actualizo la disponibilidad de asientos de un evento. Se debe ejecutar con la confirmacion de un pago satisfactorio.
+			events.PATCH("/availability/:id", eventHandler.UpdateAvailabilityForEvent)
 			events.DELETE("/:id", eventHandler.DeleteEvent)
 		}
 		seats := v1.Group("/seats")
@@ -100,7 +102,6 @@ func main() {
 		// Creacion de checkout session
 		stripe := v1.Group("/stripe")
 		{
-			//	stripe.POST("/create/checkout/session", handlers.CreateCartCheckoutSession)
 			stripe.POST("/create/checkout/session", handlers.CreateCartCheckoutSession(seatService))
 		}
 	}

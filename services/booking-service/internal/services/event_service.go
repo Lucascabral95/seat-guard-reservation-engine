@@ -67,3 +67,8 @@ func (s *EventService) UpdateEvent(id string, updatedData *models.Event) error {
 func (s *EventService) DeleteEvent(id string) error {
 	return s.repo.Delete(id)
 }
+
+// Metodo para actualizar la disponibilidad de asientos de un evento.
+func (s *EventService) UpdateEventAvailability(eventID string) error {
+	return s.repo.UpdateAvailability(eventID)
+}

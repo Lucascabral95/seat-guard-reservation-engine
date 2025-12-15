@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"booking-service/internal/models"
+	"booking-service/internal/services"
 
 	"gorm.io/gorm"
 )
@@ -28,18 +29,18 @@ func ResetAndSeed(db *gorm.DB) error {
 
 		now := time.Now()
 		events := []models.Event{
-			{Name: "Coldplay", Description: "Seed", Location: "Buenos Aires", Date: now.AddDate(0, 0, 7), Price: 15000},
-			{Name: "Metallica", Description: "Seed", Location: "Buenos Aires", Date: now.AddDate(0, 0, 14), Price: 20000},
-			{Name: "Dua Lipa", Description: "Seed", Location: "Buenos Aires", Date: now.AddDate(0, 0, 21), Price: 18000},
+			{Name: "Coldplay", Description: "Seed", Location: "Buenos Aires", Date: now.AddDate(0, 0, 7), Price: 1500000},
+			{Name: "Metallica", Description: "Seed", Location: "Buenos Aires", Date: now.AddDate(0, 0, 14), Price: 2000000},
+			{Name: "Dua Lipa", Description: "Seed", Location: "Buenos Aires", Date: now.AddDate(0, 0, 21), Price: 1800000},
 		}
 		if err := tx.Create(&events).Error; err != nil {
 			return err
 		}
 
 		cfg := []seatSectionConfig{
-			{Section: "VIP", Count: 10, Price: 30000, Prefix: "A"},
-			{Section: "PLATEA", Count: 20, Price: 20000, Prefix: "B"},
-			{Section: "GENERAL", Count: 30, Price: 15000, Prefix: "G"},
+			{Section: "VIP", Count: 10, Price: 3000000, Prefix: "A"},
+			{Section: "PLATEA", Count: 20, Price: 2000000, Prefix: "B"},
+			{Section: "GENERAL", Count: 30, Price: 1500000, Prefix: "G"},
 		}
 
 		allSeats := make([]models.Seat, 0, len(events)*(10+20+30))
@@ -50,6 +51,10 @@ func ResetAndSeed(db *gorm.DB) error {
 
 		if err := tx.Create(&allSeats).Error; err != nil {
 			return err
+		}
+
+		for _, e := range events {
+			services.UpdateEventAvailability(tx, e.ID)
 		}
 
 		return nil

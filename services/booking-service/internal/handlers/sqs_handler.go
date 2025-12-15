@@ -37,6 +37,7 @@ type StripeObject struct {
 type StripeMetadata struct {
 	UserID  string `json:"user_id"`
 	SeatIDs string `json:"seat_ids"`
+	EventID string `json:"event_id"`
 }
 
 type BookingMessage struct {
@@ -44,6 +45,7 @@ type BookingMessage struct {
 	Amount            float64 `json:"amount"`
 	Status            string  `json:"status"`
 	SeatIDs           string  `json:"seatIds"`
+	EventID           string  `json:"eventId"`
 	PaymentProviderID string  `json:"paymentProviderId"`
 }
 
@@ -58,6 +60,7 @@ func (h *SQSHandler) Send(c *gin.Context) {
 		UserID:            stripeReq.Data.Object.Metadata.UserID,
 		Amount:            stripeReq.Data.Object.AmountTotal / 100,
 		SeatIDs:           stripeReq.Data.Object.Metadata.SeatIDs,
+		EventID:           stripeReq.Data.Object.Metadata.EventID,
 		Status:            stripeReq.Data.Object.PaymentStatus,
 		PaymentProviderID: stripeReq.Data.Object.PaymentIntent,
 	}

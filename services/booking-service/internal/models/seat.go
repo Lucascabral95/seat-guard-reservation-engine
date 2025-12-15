@@ -22,6 +22,15 @@ const (
 	PaymentFailed    PaymentStatus = "FAILED"
 )
 
+type Availability string
+
+const (
+	AvailabilityHigh    Availability = "HIGH"
+	AvailabilityMedium  Availability = "MEDIUM"
+	AvailabilityLow     Availability = "LOW"
+	AvailabilitySoldOut Availability = "SOLD_OUT"
+)
+
 type BaseModel struct {
 	ID        string         `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 	CreatedAt time.Time      `json:"createdAt"`
@@ -32,11 +41,13 @@ type BaseModel struct {
 type Event struct {
 	BaseModel
 
-	Name        string    `gorm:"not null" json:"name"`
-	Description string    `json:"description,omitempty"` // Opcional en JSON
-	Location    string    `json:"location"`
-	Date        time.Time `json:"date"`
-	Price       float64   `gorm:"not null" json:"price"` // Precio base por entrada
+	Name         string       `gorm:"not null" json:"name"`
+	Description  string       `json:"description,omitempty"` // Opcional en JSON
+	Location     string       `json:"location"`
+	Date         time.Time    `json:"date"`
+	Price        int64        `gorm:"not null" json:"price"` // Precio base por entrada
+	PosterURL    string       `json:"posterUrl"`
+	Availability Availability `gorm:"type:varchar(20);default:'HIGH'" json:"availability"`
 
 	// Relación: Un evento tiene muchos asientos
 	Seats []Seat `gorm:"foreignKey:EventID" json:"seats,omitempty"`
@@ -68,7 +79,7 @@ type BookingOrder struct {
 	BaseModel
 
 	UserID string        `gorm:"not null" json:"userId"`
-	Amount float64       `gorm:"not null" json:"amount"`
+	Amount int64         `gorm:"not null" json:"amount"`
 	Status PaymentStatus `gorm:"default:'PENDING'" json:"status"`
 
 	// Asientos involucrados en esta orden

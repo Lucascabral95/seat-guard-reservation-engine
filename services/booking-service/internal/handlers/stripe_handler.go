@@ -48,6 +48,8 @@ func CreateCartCheckoutSession(seatService *services.SeatService) gin.HandlerFun
 			return
 		}
 
+		var eventID string
+
 		for _, item := range body.Items {
 			seatID := item.SeatIds.Id
 			if seatID != "" {
@@ -57,6 +59,11 @@ func CreateCartCheckoutSession(seatService *services.SeatService) gin.HandlerFun
 					c.JSON(http.StatusNotFound, gin.H{"error": "Seat not found: " + seatID})
 					return
 				}
+
+				if eventID == "" {
+					eventID = seat.EventID
+				}
+
 				// 2. Validamos estado
 				if seat.Status != models.StatusAvailable {
 					c.JSON(http.StatusConflict, gin.H{"error": "Seat/s is not available", "seatId": seatID})
@@ -82,7 +89,7 @@ func CreateCartCheckoutSession(seatService *services.SeatService) gin.HandlerFun
 			lineItems = append(lineItems, &stripe.CheckoutSessionLineItemParams{
 				PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
 					Currency:   stripe.String(currency),
-					UnitAmount: stripe.Int64(item.Amount),
+					UnitAmount: stripe.Int64(item.Amount * 100),
 					ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
 						Name: stripe.String(item.Name),
 					},
@@ -108,6 +115,7 @@ func CreateCartCheckoutSession(seatService *services.SeatService) gin.HandlerFun
 			Metadata: map[string]string{
 				"user_id":  body.UserId,
 				"seat_ids": seatsMetadata,
+				"event_id": eventID,
 			},
 		}
 

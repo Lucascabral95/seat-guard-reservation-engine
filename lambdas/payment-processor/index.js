@@ -63,24 +63,33 @@ const toPaymentStatus = (paymentStatusRaw) => {
 
 const normalizeMessage = (body) => {
   if (body && typeof body === "object") {
+    // Caso 1: Mensaje interno (SQS directo)
     if (body.userId && body.seatIds) {
       return {
         userId: String(body.userId),
         amount: Number(body.amount || 0),
         paymentStatus: body.status,
         seatIds: parseSeatIds(body.seatIds),
+        eventId: body.eventId, 
         paymentProviderId: body.paymentProviderId || "",
       };
     }
 
+    // Caso 2: Webhook de Stripe
     if (body.type && body.data && body.data.object) {
       const o = body.data.object;
       const meta = (o && o.metadata) || {};
+      
       return {
         userId: String(meta.user_id || ""),
-        amount: Number(o.amount_total || 0) / 100,
+        
+        amount: Number(o.amount_total || 0), 
+        
         paymentStatus: o.payment_status,
         seatIds: parseSeatIds(meta.seat_ids),
+        
+        eventId: meta.event_id || "", 
+        
         paymentProviderId: o.payment_intent || o.id || "",
       };
     }
@@ -125,6 +134,14 @@ const createBookingOrder = async ({ userId, amount, paymentStatus, seatIds, paym
   });
 };
 
+const updateEventAvailability = async (eventID) => {
+  // Solo llamamos si tenemos un ID válido
+  if (!eventID) return; 
+  
+  ensureBookingService();
+  return requestJson("PATCH", `${bookingServiceBaseUrl}/api/v1/events/availability/${encodeURIComponent(eventID)}`);
+};
+
 const processOne = async (rawBody) => {
   const msg = normalizeMessage(rawBody);
   if (!msg) throw new Error("Mensaje no soportado (no es Stripe event ni BookingMessage)");
@@ -135,9 +152,22 @@ const processOne = async (rawBody) => {
   const shouldCheckIdempotency = String(process.env.ENABLE_IDEMPOTENCY_LOOKUP || "true").toLowerCase() !== "false";
   const already = shouldCheckIdempotency ? await bookingOrderExists(msg.paymentProviderId) : false;
 
+  // 1. Marcar asientos como SOLD
   await markSeatsSold(msg.seatIds);
+  
+  // 2. Crear la orden de compra
   if (!already) {
     await createBookingOrder(msg);
+  }
+
+  // 3. Recalcular disponibilidad (Real Time)
+  if (msg.eventId) {
+      try {
+        await updateEventAvailability(msg.eventId);
+        console.log(`Availability updated for event: ${msg.eventId}`);
+      } catch (e) {
+        console.error("Error updating availability (non-critical):", e.message);
+      }
   }
 
   return { alreadyProcessed: already };

@@ -101,3 +101,14 @@ func (h *EventHandler) DeleteEvent(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Event deleted successfully"})
 }
+
+// PATCH /events/availability/:id
+func (h *EventHandler) UpdateAvailabilityForEvent(c *gin.Context) {
+	id := c.Param("id")
+
+	if err := h.service.UpdateEventAvailability(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update availability for event"})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Event availability successfully updated"})
+}

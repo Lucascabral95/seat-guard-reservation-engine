@@ -13,6 +13,8 @@ type EventRepository interface {
 	FindAll() ([]models.Event, error)
 	Update(event *models.Event) error
 	Delete(id string) error
+
+	UpdateAvailability(eventID string) error
 }
 
 type eventRepository struct {
@@ -50,4 +52,36 @@ func (r *eventRepository) Update(event *models.Event) error {
 
 func (r *eventRepository) Delete(id string) error {
 	return r.db.Delete(&models.Event{}, "id = ?", id).Error
+}
+
+func (r *eventRepository) UpdateAvailability(eventID string) error {
+	var totalSeats int64
+	var availableSeats int64
+
+	if err := r.db.Model(&models.Seat{}).Where("event_id = ?", eventID).Count(&totalSeats).Error; err != nil {
+		return err
+	}
+
+	if err := r.db.Model(&models.Seat{}).Where("event_id", eventID).Count(&availableSeats).Error; err != nil {
+		return err
+	}
+
+	if totalSeats == 0 {
+		return nil
+	}
+	percentage := float64(availableSeats) / float64(totalSeats)
+	var newStatus models.Availability
+
+	switch {
+	case availableSeats == 0:
+		newStatus = models.AvailabilitySoldOut
+	case percentage > 0.5:
+		newStatus = models.AvailabilityHigh
+	case availableSeats < 5:
+		newStatus = models.AvailabilityLow
+	default:
+		newStatus = models.AvailabilityMedium
+	}
+
+	return r.db.Model(&models.Event{}).Where("id = ?", eventID).Update("availability", newStatus).Error
 }
