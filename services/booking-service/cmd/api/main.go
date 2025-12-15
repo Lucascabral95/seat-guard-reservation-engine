@@ -8,6 +8,7 @@ import (
 	"booking-service/internal/config"
 	"booking-service/internal/database"
 	"booking-service/internal/database/seeds"
+	"booking-service/internal/middleware"
 
 	"booking-service/internal/handlers"
 	"booking-service/internal/messaging"
@@ -64,16 +65,18 @@ func main() {
 
 	sqsHandler := handlers.NewSQSHandler(sqsClient)
 
+	guardUserJWT := middleware.UserMiddleware()
+
 	r := gin.Default()
 	v1 := r.Group("/api/v1")
 	{
 		events := v1.Group("/events")
 		{
 			// Events
-			events.POST("", eventHandler.CreateEvent)
+			events.POST("", guardUserJWT, eventHandler.CreateEvent)
 			events.GET("", eventHandler.GetAllEvents)
-			events.GET("/:id", eventHandler.GetEventByID)
-			events.PATCH("/:id", eventHandler.UpdateEvent)
+			events.GET("/:id", guardUserJWT, eventHandler.GetEventByID)
+			events.PATCH("/:id", guardUserJWT, eventHandler.UpdateEvent)
 			// Actualizo la disponibilidad de asientos de un evento. Se debe ejecutar con la confirmacion de un pago satisfactorio.
 			events.PATCH("/availability/:id", eventHandler.UpdateAvailabilityForEvent)
 			events.DELETE("/:id", eventHandler.DeleteEvent)
@@ -81,19 +84,19 @@ func main() {
 		seats := v1.Group("/seats")
 		{
 			// Seats
-			seats.POST("", seatHandler.CreateSeat)
+			seats.POST("", guardUserJWT, seatHandler.CreateSeat)
 			seats.GET("", seatHandler.GetSeats)
-			seats.GET("/:id", seatHandler.GetSeat)
+			seats.GET("/:id", guardUserJWT, seatHandler.GetSeat)
 			seats.GET("/event/:eventId", seatHandler.GetSeatsByEventId)
-			seats.PATCH("/:id", seatHandler.UpdateSeat)
-			seats.PATCH("/lock/:id/uid/:uid", seatHandler.LockSeat)
+			seats.PATCH("/:id", guardUserJWT, seatHandler.UpdateSeat)
+			seats.PATCH("/lock/:id/uid/:uid", guardUserJWT, seatHandler.LockSeat)
 		}
 		bookingOrders := v1.Group("/booking-orders")
 		{
 			// Booking Orders
-			bookingOrders.POST("", bookingOrderHandler.CreateBookingOrder)
-			bookingOrders.GET("", bookingOrderHandler.GetBookingOrders)
-			bookingOrders.GET("/:id", bookingOrderHandler.GetBookingOrderById)
+			bookingOrders.POST("", guardUserJWT, bookingOrderHandler.CreateBookingOrder)
+			bookingOrders.GET("", guardUserJWT, bookingOrderHandler.GetBookingOrders)
+			bookingOrders.GET("/:id", guardUserJWT, bookingOrderHandler.GetBookingOrderById)
 		}
 		sqsMessaging := v1.Group("/sqs")
 		{
@@ -102,7 +105,7 @@ func main() {
 		// Creacion de checkout session
 		stripe := v1.Group("/stripe")
 		{
-			stripe.POST("/create/checkout/session", handlers.CreateCartCheckoutSession(seatService))
+			stripe.POST("/create/checkout/session", guardUserJWT, handlers.CreateCartCheckoutSession(seatService))
 		}
 	}
 
