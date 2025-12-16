@@ -59,32 +59,32 @@ El backend está construido con un stack tecnológico moderno que incluye **Go (
 
 El siguiente diagrama ilustra el flujo de datos y la interacción entre los componentes de la plataforma:
 
-```mermaid
+```
 graph TD
     subgraph "Cliente"
-        Client[Usuario Final]
+        Client["Usuario Final"]
     end
 
     subgraph "AWS Cloud"
-        ALB[Application Load Balancer]
+        ALB["Application Load Balancer"]
 
         subgraph "Amazon ECS (Fargate)"
-            AuthService[Auth Service (NestJS)]
-            BookingService[Booking Service (Go)]
+            AuthService["Auth Service (NestJS)"]
+            BookingService["Booking Service (Go)"]
         end
 
         subgraph "Cloud Database"
-            NeonDB[Neon Tech PostgreSQL]
+            NeonDB["Neon Tech PostgreSQL"]
         end
 
         subgraph "Procesamiento Asíncrono"
             SQS[SQS Queue]
-            Lambda[Payment Processor Lambda]
+            Lambda["Payment Processor Lambda"]
         end
 
         subgraph "Pasarela de Pagos Externa"
-            Stripe[Stripe API]
-            StripeWebhook[Stripe Webhook]
+            Stripe["Stripe API"]
+            StripeWebhook["Stripe Webhook"]
         end
     end
 
