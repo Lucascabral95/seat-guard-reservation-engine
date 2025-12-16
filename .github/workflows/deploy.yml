@@ -158,7 +158,11 @@ jobs:
 
       - name: Deploy Lambda
         if: env.STRIPE_SECRET_KEY != ''
+        # run: |
+        #   set -euo pipefail
+        #   echo "stripe_secret_key = \"${{ env.STRIPE_SECRET_KEY }}\"" > infra/terraform/lambda-webhook/terraform.tfvars
+        #   npm run deploy:lambda
         run: |
           set -euo pipefail
           echo "stripe_secret_key = \"${{ env.STRIPE_SECRET_KEY }}\"" > infra/terraform/lambda-webhook/terraform.tfvars
-          npm run deploy:lambda
+          npm run deploy:lambda -- -- -var="url_arn_payment=arn:aws:sqs:us-east-1:560765037562:payment-queue-reservation"
