@@ -1,3 +1,8 @@
+# Test para implementacion de Github Actions
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+# Test para implementacion de Github Actions
+
 terraform {
   required_version = ">= 1.5.0"
   # Test para implementacion de Github Actions
@@ -70,7 +75,8 @@ resource "aws_lambda_function" "stripe_processor" {
 
 # --- 3. TRIGGER SQS ---
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
-  event_source_arn = "arn:aws:sqs:us-east-1:560765037562:payment-queue-reservation"
+  // event_source_arn = "arn:aws:sqs:us-east-1:560765037562:payment-queue-reservation"
+  event_source_arn = var.url_arn_payment
   function_name    = aws_lambda_function.stripe_processor.arn
   
   batch_size       = 1   

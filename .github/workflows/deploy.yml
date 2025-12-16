@@ -1,0 +1,151 @@
+name: SeatGuard CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+concurrency:
+  group: seatguard-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+  TF_STATE_BUCKET: seatguard-terraform-state-lucas
+
+jobs:
+  # 1. ETAPA DE CALIDAD (CI)
+  # Verifica que el código no esté roto antes de intentar desplegar
+  quality-check:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # --- Validación Booking Service (Go) ---
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: services/booking-service/go.sum
+      
+      - name: Verify Go Build
+        working-directory: services/booking-service
+        run: go build ./cmd/api
+
+      # --- Validación Auth Service (NestJS) ---
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: services/auth-service/package-lock.json
+
+      - name: Verify NestJS Build
+        working-directory: services/auth-service
+        run: |
+          npm ci
+          npm run build
+
+  # 2. ETAPA DE DESPLIEGUE (CD)
+  # Solo se ejecuta si quality-check pasa Y estamos en la rama main
+  deploy:
+    name: Deploy to AWS
+    needs: quality-check
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS Identity
+        run: aws sts get-caller-identity
+
+      - name: Verify Terraform State Backend (S3)
+        run: aws s3api head-bucket --bucket "${{ env.TF_STATE_BUCKET }}"
+
+      - name: Resolve AWS Account ID
+        id: aws-account
+        run: echo "account_id=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_OUTPUT
+
+      - name: Ensure ECR Repositories Exist
+        run: |
+          set -euo pipefail
+          aws ecr describe-repositories --repository-names auth-service >/dev/null 2>&1 || aws ecr create-repository --repository-name auth-service >/dev/null
+          aws ecr describe-repositories --repository-names booking-service >/dev/null 2>&1 || aws ecr create-repository --repository-name booking-service >/dev/null
+
+      - name: Login to Amazon ECR
+        run: |
+          set -euo pipefail
+          aws ecr get-login-password --region "${{ env.AWS_REGION }}" | docker login --username AWS --password-stdin "${{ steps.aws-account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+
+      - name: Build & Push Docker Images
+        run: |
+          set -euo pipefail
+
+          ECR_REGISTRY="${{ steps.aws-account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+
+          docker build -t auth-service ./services/auth-service
+          docker tag auth-service:latest "$ECR_REGISTRY/auth-service:latest"
+          docker push "$ECR_REGISTRY/auth-service:latest"
+
+          docker build -t booking-service ./services/booking-service
+          docker tag booking-service:latest "$ECR_REGISTRY/booking-service:latest"
+          docker push "$ECR_REGISTRY/booking-service:latest"
+
+      # Instala Terraform
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init (Fargate)
+        working-directory: infra/terraform
+        run: terraform init -input=false
+
+      - name: Deploy Fargate
+        run: |
+          set -euo pipefail
+          if [ -n "${{ secrets.TERRAFORM_TFVARS_FARGATE }}" ]; then
+            printf '%s' "${{ secrets.TERRAFORM_TFVARS_FARGATE }}" > infra/terraform/terraform.tfvars
+          fi
+          npm run deploy:fargate
+
+      - name: Force New Deployment (ECS)
+        run: |
+          set -euo pipefail
+          aws ecs update-service --cluster monorepo-prod-cluster --service auth-service --force-new-deployment --region "${{ env.AWS_REGION }}" >/dev/null
+          aws ecs update-service --cluster monorepo-prod-cluster --service booking-service --force-new-deployment --region "${{ env.AWS_REGION }}" >/dev/null
+
+      # Despliega Serverless (Lambda)
+      - name: Install Lambda Dependencies
+        if: env.STRIPE_SECRET_KEY != ''
+        working-directory: lambdas/payment-processor
+        run: npm install
+
+      - name: Terraform Init (Lambda)
+        if: env.STRIPE_SECRET_KEY != ''
+        working-directory: infra/terraform/lambda-webhook
+        run: terraform init -input=false
+
+      - name: Deploy Lambda
+        if: env.STRIPE_SECRET_KEY != ''
+        run: |
+          set -euo pipefail
+          echo "stripe_secret_key = \"${{ env.STRIPE_SECRET_KEY }}\"" > infra/terraform/lambda-webhook/terraform.tfvars
+          npm run deploy:lambda

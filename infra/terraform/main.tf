@@ -1,4 +1,6 @@
 # Test para implementacion de Github Actions
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
 terraform {
   backend "s3" {
     bucket = "seatguard-terraform-state-lucas" 
@@ -7,15 +9,24 @@ terraform {
   }
 }
 # Test para implementacion de Github Actions
+
 provider "aws" {
   region = "us-east-1"
 }
 
+# locals {
+#   image_auth    = "560765037562.dkr.ecr.us-east-1.amazonaws.com/auth-service:latest"
+#   image_booking = "560765037562.dkr.ecr.us-east-1.amazonaws.com/booking-service:latest"
+#   app_name      = "monorepo-prod"
+# }
+
+# Test para implementacion de Github Actions
 locals {
-  image_auth    = "560765037562.dkr.ecr.us-east-1.amazonaws.com/auth-service:latest"
-  image_booking = "560765037562.dkr.ecr.us-east-1.amazonaws.com/booking-service:latest"
-  app_name      = "monorepo-prod"
+  image_auth    = var.names_images_ecr["auth-service-image"]
+  image_booking = var.names_images_ecr["booking-service-image"]
+  app_name      = var.names_images_ecr["app_name"]
 }
+# Test para implementacion de Github Actions
 
 # 1. LOGS
 resource "aws_cloudwatch_log_group" "auth_logs" {
