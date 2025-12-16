@@ -3,7 +3,6 @@ services:
     build:
       context: ./services/auth-service
       dockerfile: Dockerfile
-      target: development
     container_name: auth-service
     restart: unless-stopped
     ports:

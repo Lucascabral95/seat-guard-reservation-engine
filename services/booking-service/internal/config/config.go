@@ -35,10 +35,10 @@ func LoadConfig() *Config {
 		Port:      getEnv("PORT", "8080"),
 		JWTSecret: os.Getenv("JWT_SECRET"),
 
-		DBHost:     getEnv("DB_HOST", "localhost"),
-		DBUser:     getEnv("DB_USER", "localhost"),
-		DBPassword: getEnv("DB_PASSWORD", "5432"),
-		DBName:     getEnv("DB_NAME", "5432"),
+		DBHost:     getEnv("DB_HOST", ""),
+		DBUser:     getEnv("DB_USER", ""),
+		DBPassword: getEnv("DB_PASSWORD", ""),
+		DBName:     getEnv("DB_NAME", ""),
 		DBPort:     getEnv("DB_PORT", "5432"),
 
 		DBUrl:   getEnv("DB_URL", ""),

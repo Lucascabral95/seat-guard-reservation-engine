@@ -34,50 +34,48 @@
 # EXPOSE 3000
 # CMD ["node", "dist/src/main.js"]
 
+# Stage 1: Base
+FROM node:20-alpine AS base
+# Instalar OpenSSL (OBLIGATORIO para Prisma en Alpine)
+RUN apk add --no-cache openssl libc6-compat
 
-# Stage 1: Base & Dependencies
-FROM node:22-alpine AS base
 WORKDIR /usr/src/app
-# Necesario para que prisma funcione en Alpine si usa binarios nativos de SSL
-RUN apk add --no-cache openssl 
+
+# Stage 2: Builder
+FROM base AS builder
 
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Instalamos todo para el build
-RUN npm ci 
-# Generamos el cliente aquí para asegurar que 'builder' lo tenga
+# Instalar dependencias
+RUN npm ci
+
+# Generar cliente (ahora se guarda en node_modules/@prisma/client)
 RUN npx prisma generate
 
-# Stage 2: Development
-FROM base AS development
-CMD ["npm", "run", "start:dev"]
-
-# Stage 3: Builder
-FROM base AS builder
 COPY . .
-# Importante: NestJS usa el cliente generado en node_modules
+
+# Compilar NestJS
 RUN npm run build
 
-# Stage 4: Production (CORREGIDO)
-FROM node:22-alpine AS production
-ENV NODE_ENV=production
-WORKDIR /usr/src/app
+# Stage 3: Production
+FROM base AS production
 
-# Importante para Alpine en prod también
-RUN apk add --no-cache openssl
+ENV NODE_ENV=production
 
 COPY package*.json ./
 COPY prisma ./prisma/
 
-RUN npm ci --omit=dev && npm i -D prisma
+# Instalamos deps de producción Y prisma CLI para poder regenerar
+RUN npm ci --omit=dev && npm install --no-save prisma
 
+# Regeneramos el cliente ESPECÍFICAMENTE para el entorno Alpine de producción
 RUN npx prisma generate
 
-RUN npm cache clean --force
-
+# Copiamos el build limpio
 COPY --from=builder /usr/src/app/dist ./dist
 
 USER node
 EXPOSE 3000
+
 CMD ["node", "dist/src/main.js"]
