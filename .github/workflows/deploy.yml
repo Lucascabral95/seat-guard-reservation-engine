@@ -156,13 +156,17 @@ jobs:
         working-directory: infra/terraform/lambda-webhook
         run: terraform init -input=false -upgrade -reconfigure
 
+      # - name: Deploy Lambda
+      #   if: env.STRIPE_SECRET_KEY != ''
+      #   run: |
+      #     set -euo pipefail
+      #     echo "stripe_secret_key = \"${{ env.STRIPE_SECRET_KEY }}\"" > infra/terraform/lambda-webhook/terraform.tfvars
+      #     npm run deploy:lambda
       - name: Deploy Lambda
         if: env.STRIPE_SECRET_KEY != ''
-        # run: |
-        #   set -euo pipefail
-        #   echo "stripe_secret_key = \"${{ env.STRIPE_SECRET_KEY }}\"" > infra/terraform/lambda-webhook/terraform.tfvars
-        #   npm run deploy:lambda
+        env:
+          TF_VAR_url_arn_payment: "arn:aws:sqs:us-east-1:560765037562:payment-queue-reservation"
         run: |
           set -euo pipefail
           echo "stripe_secret_key = \"${{ env.STRIPE_SECRET_KEY }}\"" > infra/terraform/lambda-webhook/terraform.tfvars
-          npm run deploy:lambda -- -- -var="url_arn_payment=arn:aws:sqs:us-east-1:560765037562:payment-queue-reservation"
+          npm run deploy:lambda
