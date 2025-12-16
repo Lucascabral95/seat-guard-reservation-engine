@@ -131,13 +131,25 @@ jobs:
         working-directory: infra/terraform
         run: terraform init -input=false -upgrade -reconfigure
 
+      # - name: Deploy Fargate
+      #   run: |
+      #     set -euo pipefail
+      #     if [ -n "${{ secrets.TERRAFORM_TFVARS_FARGATE }}" ]; then
+      #       printf '%s' "${{ secrets.TERRAFORM_TFVARS_FARGATE }}" > infra/terraform/terraform.tfvars
+      #     fi
+      #     npm run deploy:fargate
       - name: Deploy Fargate
         run: |
           set -euo pipefail
-          if [ -n "${{ secrets.TERRAFORM_TFVARS_FARGATE }}" ]; then
-            printf '%s' "${{ secrets.TERRAFORM_TFVARS_FARGATE }}" > infra/terraform/terraform.tfvars
-          fi
+          
+          cat <<EOF > infra/terraform/terraform.tfvars
+          ${{ secrets.TERRAFORM_TFVARS_FARGATE }}
+          EOF
+          
+          ls -l infra/terraform/terraform.tfvars
+          
           npm run deploy:fargate
+
 
       - name: Force New Deployment (ECS)
         run: |
