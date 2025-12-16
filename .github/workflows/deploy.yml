@@ -129,7 +129,7 @@ jobs:
 
       - name: Terraform Init (Fargate)
         working-directory: infra/terraform
-        run: terraform init -input=false
+        run: terraform init -input=false -upgrade -reconfigure
 
       - name: Deploy Fargate
         run: |
@@ -154,7 +154,7 @@ jobs:
       - name: Terraform Init (Lambda)
         if: env.STRIPE_SECRET_KEY != ''
         working-directory: infra/terraform/lambda-webhook
-        run: terraform init -input=false
+        run: terraform init -input=false -upgrade -reconfigure
 
       - name: Deploy Lambda
         if: env.STRIPE_SECRET_KEY != ''
