@@ -81,8 +81,18 @@ jobs:
       - name: Verify AWS Identity
         run: aws sts get-caller-identity
 
-      - name: Verify Terraform State Backend (S3)
-        run: aws s3api head-bucket --bucket "${{ env.TF_STATE_BUCKET }}"
+      # - name: Verify Terraform State Backend (S3)
+      #   run: aws s3api head-bucket --bucket "${{ env.TF_STATE_BUCKET }}"
+      - name: Verify or Create Terraform State Backend
+        run: |
+          # Si head-bucket falla (el bucket no existe), lo creamos.
+          if ! aws s3api head-bucket --bucket "${{ env.TF_STATE_BUCKET }}" 2>/dev/null; then
+            echo "Bucket no encontrado. Creando bucket: ${{ env.TF_STATE_BUCKET }}..."
+            aws s3api create-bucket --bucket "${{ env.TF_STATE_BUCKET }}" --region "${{ env.AWS_REGION }}"
+            echo "Bucket creado exitosamente."
+          else
+            echo "El bucket ya existe."
+          fi
 
       - name: Resolve AWS Account ID
         id: aws-account
