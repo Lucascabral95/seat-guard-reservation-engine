@@ -81,8 +81,6 @@ jobs:
       - name: Verify AWS Identity
         run: aws sts get-caller-identity
 
-      # - name: Verify Terraform State Backend (S3)
-      #   run: aws s3api head-bucket --bucket "${{ env.TF_STATE_BUCKET }}"
       - name: Verify or Create Terraform State Backend
         run: |
           # Si head-bucket falla (el bucket no existe), lo creamos.
@@ -131,23 +129,12 @@ jobs:
         working-directory: infra/terraform
         run: terraform init -input=false -upgrade -reconfigure
 
-      # - name: Deploy Fargate
-      #   run: |
-      #     set -euo pipefail
-      #     if [ -n "${{ secrets.TERRAFORM_TFVARS_FARGATE }}" ]; then
-      #       printf '%s' "${{ secrets.TERRAFORM_TFVARS_FARGATE }}" > infra/terraform/terraform.tfvars
-      #     fi
-      #     npm run deploy:fargate
       - name: Deploy Fargate
         run: |
           set -euo pipefail
-          
           cat <<EOF > infra/terraform/terraform.tfvars
           ${{ secrets.TERRAFORM_TFVARS_FARGATE }}
           EOF
-          
-          ls -l infra/terraform/terraform.tfvars
-          
           npm run deploy:fargate
 
 
@@ -170,10 +157,6 @@ jobs:
 
       # - name: Deploy Lambda
       #   if: env.STRIPE_SECRET_KEY != ''
-      #   run: |
-      #     set -euo pipefail
-      #     echo "stripe_secret_key = \"${{ env.STRIPE_SECRET_KEY }}\"" > infra/terraform/lambda-webhook/terraform.tfvars
-      #     npm run deploy:lambda
       - name: Deploy Lambda
         if: env.STRIPE_SECRET_KEY != ''
         env:

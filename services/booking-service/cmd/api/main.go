@@ -70,6 +70,11 @@ func main() {
 	r := gin.Default()
 	v1 := r.Group("/api/v1")
 	{
+		v1.GET("health", func(c *gin.Context) {
+			c.JSON(200, gin.H{
+				"status": "Health is OK!",
+			})
+		})
 		events := v1.Group("/events")
 		{
 			// Events
