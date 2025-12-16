@@ -1,3 +1,12 @@
+# Test para implementacion de Github Actions
+terraform {
+  backend "s3" {
+    bucket = "seatguard-terraform-state-lucas" 
+    key    = "fargate/terraform.tfstate"       
+    region = "us-east-1"
+  }
+}
+# Test para implementacion de Github Actions
 provider "aws" {
   region = "us-east-1"
 }

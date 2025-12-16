@@ -1,8 +1,9 @@
 {
   "scripts": {
     "auth:run": "cd services/auth-service && nest start --watch",
-    "go:run": "cd services/booking-service && go run cmd/api/main.go",
     "go:seed": "cd services/booking-service && go run cmd/api/main.go -seed",
+    "go:run": "cd services/booking-service && go run cmd/api/main.go",
+    "nest:run": "cd services/auth-service && nest start --watch",
 
     "deploy:fargate": "cd infra/terraform && terraform apply -auto-approve",
     "destroy:fargate": "cd infra/terraform && terraform destroy -auto-approve",

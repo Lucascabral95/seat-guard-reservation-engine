@@ -1,5 +1,12 @@
 terraform {
   required_version = ">= 1.5.0"
+  # Test para implementacion de Github Actions
+  backend "s3" {
+    bucket = "seatguard-terraform-state-lucas" 
+    key    = "lambda/terraform.tfstate"        
+    region = "us-east-1"
+  }
+  # Test para implementacion de Github Actions
   required_providers {
     aws = {
       source  = "hashicorp/aws"
