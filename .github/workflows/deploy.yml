@@ -50,6 +50,7 @@ jobs:
         working-directory: services/auth-service
         run: |
           npm ci
+          npx prisma generate
           npm run build
 
   # 2. ETAPA DE DESPLIEGUE (CD)
