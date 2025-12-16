@@ -1,13 +1,13 @@
 # Test para implementacion de Github Actions
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
-terraform {
-  backend "s3" {
-    bucket = "seatguard-terraform-state-lucas" 
-    key    = "fargate/terraform.tfstate"       
-    region = "us-east-1"
-  }
-}
+# terraform {
+#   backend "s3" {
+#     bucket = "seatguard-terraform-state-lucas" 
+#     key    = "fargate/terraform.tfstate"       
+#     region = "us-east-1"
+#   }
+# }
 # Test para implementacion de Github Actions
 
 provider "aws" {
