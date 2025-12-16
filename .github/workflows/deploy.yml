@@ -158,7 +158,7 @@ jobs:
 
       # - name: Deploy Lambda
       #   if: env.STRIPE_SECRET_KEY != ''
-      #   run: |
+      #   run run: |
       #     set -euo pipefail
       #     echo "stripe_secret_key = \"${{ env.STRIPE_SECRET_KEY }}\"" > infra/terraform/lambda-webhook/terraform.tfvars
       #     npm run deploy:lambda
@@ -170,3 +170,4 @@ jobs:
           set -euo pipefail
           echo "stripe_secret_key = \"${{ env.STRIPE_SECRET_KEY }}\"" > infra/terraform/lambda-webhook/terraform.tfvars
           npm run deploy:lambda
+   
