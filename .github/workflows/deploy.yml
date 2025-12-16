@@ -135,7 +135,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "${{ secrets.TERRAFORM_TFVARS_FARGATE }}" ]; then
-            printf '%s' "${{ secrets.TERRAFORM_TFVARS_FARGATE }}" > infra/terraform/ci.auto.tfvars
+            printf '%s' "${{ secrets.TERRAFORM_TFVARS_FARGATE }}" > infra/terraform/terraform.tfvars
           fi
           npm run deploy:fargate
 

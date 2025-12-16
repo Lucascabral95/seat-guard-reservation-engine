@@ -35,7 +35,7 @@
 # CMD ["node", "dist/src/main.js"]
 
 # Stage 1: Base
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 # Instalar OpenSSL (OBLIGATORIO para Prisma en Alpine)
 RUN apk add --no-cache openssl libc6-compat
 
@@ -67,7 +67,7 @@ COPY package*.json ./
 COPY prisma ./prisma/
 
 # Instalamos deps de producción Y prisma CLI para poder regenerar
-RUN npm ci --omit=dev && npm install --no-save prisma
+RUN npm ci --omit=dev && npm install -D prisma
 
 # Regeneramos el cliente ESPECÍFICAMENTE para el entorno Alpine de producción
 RUN npx prisma generate

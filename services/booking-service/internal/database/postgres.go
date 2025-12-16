@@ -4,7 +4,6 @@ import (
 	"booking-service/internal/config"
 	"booking-service/internal/models"
 
-	"fmt"
 	"log"
 
 	"gorm.io/driver/postgres"
@@ -13,19 +12,6 @@ import (
 
 func InitDB(cfg *config.Config) *gorm.DB {
 	dsn := cfg.DBUrl
-	if dsn == "" {
-		if cfg.DBHost == "" || cfg.DBUser == "" || cfg.DBPassword == "" || cfg.DBName == "" {
-			log.Fatal("❌ Database config missing: set DB_URL or set DB_HOST, DB_USER, DB_PASSWORD, DB_NAME (and optionally DB_PORT)")
-		}
-		dsn = fmt.Sprintf(
-			"host=%s user=%s password=%s dbname=%s port=%s sslmode=require",
-			cfg.DBHost,
-			cfg.DBUser,
-			cfg.DBPassword,
-			cfg.DBName,
-			cfg.DBPort,
-		)
-	}
 	log.Println("   -> Intentando abrir conexión GORM...")
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
