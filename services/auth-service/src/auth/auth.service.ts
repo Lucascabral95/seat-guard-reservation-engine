@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { CreateAuthDto, LoginAuthDto, PayloadJWTDto } from './dto';
 import * as bcrypt from "bcrypt"
 import { PrismaService } from 'src/prisma/prisma.service';
 import { handlePrismaError } from 'src/errors/handler-prisma-error';
 import { JwtService } from '@nestjs/jwt';
+import { COMMON_PASSWORDS } from 'src/common/constants/security.constants';
 
 @Injectable()
 export class AuthService {
@@ -12,13 +13,21 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private jwtService: JwtService
   ) {}
-  
-  async register(createAuthDto: CreateAuthDto) {
+
+ async register(createAuthDto: CreateAuthDto) {
     try {
       const { email, password, name } = createAuthDto;
 
-      const saltOrRounds = 10;
-      const passwordHashed = await bcrypt.hash(password, saltOrRounds); 
+      await this.findUserByEmail(email);
+
+      const normalizedPassword = password.toLowerCase();
+
+      if (COMMON_PASSWORDS.has(normalizedPassword)) {
+        throw new BadRequestException('Esta contraseña es demasiado común');
+      }
+
+      const saltOrRounds = 12;
+      const passwordHashed = await bcrypt.hash(password, saltOrRounds);
       const lowerCaseEmail = email.toLowerCase();
 
       const user = await this.prisma.user.create({
@@ -29,19 +38,18 @@ export class AuthService {
         },
       });
 
-      const { password: _, ...userWithoutPassword  } = user;
-
+      const { password: _, ...userWithoutPassword } = user;
       return userWithoutPassword;
-   } catch (error) {
-  if (
-    error instanceof BadRequestException ||
-    error instanceof InternalServerErrorException ||
-    error instanceof NotFoundException
-  ) {
-    throw error;
-  }
-  handlePrismaError(error, "User");
-}
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof InternalServerErrorException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      handlePrismaError(error, 'User');
+    }
   }
 
    async login(loginAuthDto: LoginAuthDto) {
@@ -96,8 +104,6 @@ async signIn(payloaJWTDto: PayloadJWTDto) {
   }
 }
 
-/////////////////////////////////////
-/////////////////////////////////////
   async findAll() {
     try {
       const users = await this.prisma.user.findMany();
@@ -114,16 +120,26 @@ async signIn(payloaJWTDto: PayloadJWTDto) {
        handlePrismaError(error, "Users")
     }
   }
+  
+  async findUserByEmail(email: string) {
+    try {
+       const findUser = await this.prisma.user.findFirst({
+        where: {
+          email: email,
+        },
+       })
 
-  // findOne(id: string) {
-  //   return `This action returns a #${id} auth`;
-  // }
+       if (findUser) {
+        throw new BadRequestException("Usuario ya existente con este email")
+       }
+      
+       return;
+    } catch (error) {
+      if(error instanceof UnauthorizedException || error instanceof BadRequestException || error instanceof NotFoundException || error instanceof InternalServerErrorException ) {
+        throw error;
+      }
+      handlePrismaError(error, "Users")
+    }
+  }
 
-  // update(id: number, updateAuthDto: UpdateAuthDto) {
-  //   return `This action updates a #${id} auth`;
-  // }
-
-  // remove(id: number) {
-  //   return `This action removes a #${id} auth`;
-  // }
 }
