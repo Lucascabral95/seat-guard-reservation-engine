@@ -3,19 +3,31 @@ const Stripe = require("stripe");
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
-const bookingServiceBaseUrl = ("http://monorepo-prod-alb-17945421.us-east-1.elb.amazonaws.com:8080" || "http://monorepo-prod-alb-17945421.us-east-1.elb.amazonaws.com:8080" || "").replace(/\/$/, "");
+const internalApiKey = process.env.INTERNAL_API_KEY || process.env.SECRET_X_INTERNAL_SECRET || "";
+
+console.log("🔑 Internal API Key configurada:", internalApiKey ? `SÍ (Longitud: ${internalApiKey.length})` : "NO");
+
+const defaultUrl = "http://monorepo-prod-alb-1569205323.us-east-1.elb.amazonaws.com:8080"; 
+const bookingServiceBaseUrl = (process.env.BOOKING_SERVICE_URL || defaultUrl).replace(/\/$/, "");
+
+console.log("🌐 URL base del servicio:", bookingServiceBaseUrl);
 
 const requestJson = async (method, url, body) => {
   const controller = new AbortController();
-  const timeoutMs = Number(process.env.HTTP_TIMEOUT_MS || 8000);
+  const timeoutMs = Number(process.env.HTTP_TIMEOUT_MS || 10000);
   const t = setTimeout(() => controller.abort(), timeoutMs);
+
+  const headers = { "content-type": "application/json" };
+  if (internalApiKey) {
+    headers["X-Internal-Secret"] = internalApiKey;
+  }
+
+  console.log(`📡 Intentando ${method} a: ${url}`);
 
   try {
     const res = await fetch(url, {
       method,
-      headers: {
-        "content-type": "application/json",
-      },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: controller.signal,
     });
@@ -29,6 +41,7 @@ const requestJson = async (method, url, body) => {
     }
 
     if (!res.ok) {
+      console.error(`❌ SERVER ERROR ${res.status} ${url}. Body:`, text);
       const err = new Error(`HTTP ${res.status} ${method} ${url}`);
       err.status = res.status;
       err.response = json;
@@ -36,6 +49,11 @@ const requestJson = async (method, url, body) => {
     }
 
     return json;
+  } catch (error) {
+    console.error(`🔥 NETWORK ERROR en ${method} ${url}:`);
+    console.error(`   Mensaje: ${error.message}`);
+    if (error.cause) console.error(`   Causa:`, error.cause);
+    throw error;
   } finally {
     clearTimeout(t);
   }
@@ -46,10 +64,7 @@ const parseSeatIds = (seatIdsRaw) => {
     return seatIdsRaw.map(String).map((s) => s.trim()).filter(Boolean);
   }
   if (typeof seatIdsRaw === "string") {
-    return seatIdsRaw
-      .split(",")
-      .map((s) => String(s).trim())
-      .filter(Boolean);
+    return seatIdsRaw.split(",").map((s) => String(s).trim()).filter(Boolean);
   }
   return [];
 };
@@ -63,33 +78,25 @@ const toPaymentStatus = (paymentStatusRaw) => {
 
 const normalizeMessage = (body) => {
   if (body && typeof body === "object") {
-    // Caso 1: Mensaje interno (SQS directo)
     if (body.userId && body.seatIds) {
       return {
         userId: String(body.userId),
         amount: Number(body.amount || 0),
         paymentStatus: body.status,
         seatIds: parseSeatIds(body.seatIds),
-        eventId: body.eventId, 
+        eventId: body.eventId,
         paymentProviderId: body.paymentProviderId || "",
       };
     }
-
-    // Caso 2: Webhook de Stripe
     if (body.type && body.data && body.data.object) {
       const o = body.data.object;
       const meta = (o && o.metadata) || {};
-      
       return {
         userId: String(meta.user_id || ""),
-        
-        amount: Number(o.amount_total || 0), 
-        
+        amount: Number(o.amount_total || 0),
         paymentStatus: o.payment_status,
         seatIds: parseSeatIds(meta.seat_ids),
-        
-        eventId: meta.event_id || "", 
-        
+        eventId: meta.event_id || "",
         paymentProviderId: o.payment_intent || o.id || "",
       };
     }
@@ -99,7 +106,7 @@ const normalizeMessage = (body) => {
 
 const ensureBookingService = () => {
   if (!bookingServiceBaseUrl) {
-    throw new Error("BOOKING_SERVICE_BASE_URL/BOOKING_SERVICE_URL no configurado");
+    throw new Error("BOOKING_SERVICE_BASE_URL no configurado y fallback vacío");
   }
 };
 
@@ -118,7 +125,7 @@ const bookingOrderExists = async (paymentProviderId) => {
     if (!Array.isArray(orders)) return false;
     return orders.some((o) => o && String(o.paymentProviderId || "") === String(paymentProviderId));
   } catch (e) {
-    console.error("❌ Error verificando idempotencia en booking-orders:", e && e.message ? e.message : e);
+    console.error("❌ Error verificando idempotencia (no crítico):", e.message);
     return false;
   }
 };
@@ -135,39 +142,33 @@ const createBookingOrder = async ({ userId, amount, paymentStatus, seatIds, paym
 };
 
 const updateEventAvailability = async (eventID) => {
-  // Solo llamamos si tenemos un ID válido
-  if (!eventID) return; 
-  
+  if (!eventID) return;
   ensureBookingService();
   return requestJson("PATCH", `${bookingServiceBaseUrl}/api/v1/events/availability/${encodeURIComponent(eventID)}`);
 };
 
 const processOne = async (rawBody) => {
   const msg = normalizeMessage(rawBody);
-  if (!msg) throw new Error("Mensaje no soportado (no es Stripe event ni BookingMessage)");
+  if (!msg) throw new Error("Mensaje no soportado");
   if (!msg.userId) throw new Error("Falta userId");
   if (!msg.seatIds || msg.seatIds.length === 0) throw new Error("Faltan seatIds");
-  if (!Number.isFinite(msg.amount)) throw new Error("Amount inválido");
-
+  
   const shouldCheckIdempotency = String(process.env.ENABLE_IDEMPOTENCY_LOOKUP || "true").toLowerCase() !== "false";
   const already = shouldCheckIdempotency ? await bookingOrderExists(msg.paymentProviderId) : false;
 
-  // 1. Marcar asientos como SOLD
   await markSeatsSold(msg.seatIds);
   
-  // 2. Crear la orden de compra
   if (!already) {
     await createBookingOrder(msg);
   }
 
-  // 3. Recalcular disponibilidad (Real Time)
   if (msg.eventId) {
-      try {
-        await updateEventAvailability(msg.eventId);
-        console.log(`Availability updated for event: ${msg.eventId}`);
-      } catch (e) {
-        console.error("Error updating availability (non-critical):", e.message);
-      }
+    try {
+      await updateEventAvailability(msg.eventId);
+      console.log(`Availability updated for event: ${msg.eventId}`);
+    } catch (e) {
+      console.error("Error updating availability (non-critical):", e.message);
+    }
   }
 
   return { alreadyProcessed: already };
@@ -176,34 +177,28 @@ const processOne = async (rawBody) => {
 exports.handler = async (event) => {
   console.log("🔔 Webhook/SQS Handler iniciado");
 
-  // Si el evento viene de SQS, itero los registros
   if (event.Records) {
     const batchItemFailures = [];
-
     for (const record of event.Records) {
       try {
         const body = typeof record.body === "string" ? JSON.parse(record.body) : record.body;
         console.log("📩 Mensaje SQS recibido:", JSON.stringify(body, null, 2));
         await processOne(body);
       } catch (err) {
-        console.error("❌ Error procesando mensaje SQS:", err && err.message ? err.message : err);
+        console.error("❌ Error procesando mensaje SQS:", err.message);
         if (record && record.messageId) {
           batchItemFailures.push({ itemIdentifier: record.messageId });
         }
       }
     }
-
-    if (batchItemFailures.length > 0) {
-      return { batchItemFailures };
-    }
-    return { statusCode: 200, body: "SQS Processed" };
+    return { batchItemFailures };
   }
 
   console.log("Evento directo (no SQS):", JSON.stringify(event));
   try {
     await processOne(event);
   } catch (err) {
-    console.error("❌ Error procesando evento directo:", err && err.message ? err.message : err);
+    console.error("❌ Error procesando evento directo:", err.message);
     return { statusCode: 500, body: "ERROR" };
   }
   return { statusCode: 200, body: "OK" };

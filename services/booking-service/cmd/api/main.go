@@ -79,12 +79,12 @@ func main() {
 		{
 			// Events
 			events.POST("", guardUserJWT, eventHandler.CreateEvent)
-			events.GET("", eventHandler.GetAllEvents)
+			events.GET("", guardUserJWT, eventHandler.GetAllEvents)
 			events.GET("/:id", guardUserJWT, eventHandler.GetEventByID)
 			events.PATCH("/:id", guardUserJWT, eventHandler.UpdateEvent)
 			// Actualizo la disponibilidad de asientos de un evento. Se debe ejecutar con la confirmacion de un pago satisfactorio.
 			events.PATCH("/availability/:id", eventHandler.UpdateAvailabilityForEvent)
-			events.DELETE("/:id", eventHandler.DeleteEvent)
+			events.DELETE("/:id", guardUserJWT, eventHandler.DeleteEvent)
 		}
 		seats := v1.Group("/seats")
 		{

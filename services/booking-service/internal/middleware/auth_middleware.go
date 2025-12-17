@@ -11,6 +11,15 @@ import (
 
 func UserMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// --- AGREGA ESTO AL PRINCIPIO ---
+		// Si el header tiene la clave maestra, pasa directo.
+		internalKey := os.Getenv("SECRET_X_INTERNAL_SECRET")
+		if internalKey != "" && c.GetHeader("X-Internal-Secret") == internalKey {
+			c.Next()
+			return
+		}
+		// -------------------------------
+
 		tokenString, err := utils.ExtractToken(c)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})

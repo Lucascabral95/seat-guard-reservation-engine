@@ -69,6 +69,7 @@ resource "aws_lambda_function" "stripe_processor" {
   environment {
     variables = {
       STRIPE_SECRET_KEY = var.stripe_secret_key
+      SECRET_X_INTERNAL_SECRET = var.x_internal_secret
     }
   }
 }

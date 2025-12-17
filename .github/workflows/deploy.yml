@@ -16,6 +16,8 @@ env:
   TF_INPUT: "false"
   STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
   TF_STATE_BUCKET: seatguard-terraform-state-lucas
+  SECRET_X_INTERNAL_SECRET: ${{ secrets.SECRET_X_INTERNAL_SECRET }}
+
 
 jobs:
   # 1. ETAPA DE CALIDAD (CI)
@@ -155,12 +157,11 @@ jobs:
         working-directory: infra/terraform/lambda-webhook
         run: terraform init -input=false -upgrade -reconfigure
 
-      # - name: Deploy Lambda
-      #   if: env.STRIPE_SECRET_KEY != ''
       - name: Deploy Lambda
         if: env.STRIPE_SECRET_KEY != ''
         env:
           TF_VAR_url_arn_payment: "arn:aws:sqs:us-east-1:560765037562:payment-queue-reservation"
+          TF_VAR_x_internal_secret: "${{ env.SECRET_X_INTERNAL_SECRET }}"
         run: |
           set -euo pipefail
           echo "stripe_secret_key = \"${{ env.STRIPE_SECRET_KEY }}\"" > infra/terraform/lambda-webhook/terraform.tfvars
