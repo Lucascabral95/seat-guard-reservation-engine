@@ -64,12 +64,12 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Credenciales inválidas.');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Credenciales inválidas.');
     }
 
     const res = this.signIn({
@@ -109,7 +109,7 @@ async signIn(payloaJWTDto: PayloadJWTDto) {
       const users = await this.prisma.user.findMany();
 
       if (!users) {
-        return new NotFoundException("No users registrered")
+        return new NotFoundException("Sin usuarios registrados.")
       }
 
       return users;

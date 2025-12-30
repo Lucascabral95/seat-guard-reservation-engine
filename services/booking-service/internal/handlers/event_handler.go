@@ -35,6 +35,7 @@ func (h *EventHandler) CreateEvent(c *gin.Context) {
 	c.JSON(http.StatusCreated, event)
 }
 
+// GET /events/id
 func (h *EventHandler) GetEventByID(c *gin.Context) {
 	id := c.Param("id")
 
@@ -59,7 +60,11 @@ func (h *EventHandler) GetEventByID(c *gin.Context) {
 
 // GET /events
 func (h *EventHandler) GetAllEvents(c *gin.Context) {
-	events, err := h.service.GetAllEvents()
+	name := c.Query("name")
+	gender := c.Query("gender")
+	location := c.Query("location")
+
+	events, err := h.service.GetAllEvents(models.EventFilter{Name: name, Gender: gender, Location: location})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch events"})
 		return

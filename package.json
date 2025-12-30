@@ -11,7 +11,9 @@
     "deploy:lambda": "cd infra/terraform/lambda-webhook && terraform apply -auto-approve",
     "destroy:lambda": "cd infra/terraform/lambda-webhook && terraform destroy -auto-approve",
     
-    "docker:compose": "docker-compose up -d --build", 
+    "docker:compose": "docker-compose up -d --build",  
+    "docker:compose:booking": "docker-compose up -d --build --no-deps booking-service",  
+    "docker:compose:auth": "docker-compose up -d --build --no-deps auth-service",  
     "docker:push": "bash scripts/deploy-images.sh",
     "docker:all": "npm run docker:compose && npm run docker:push",
 

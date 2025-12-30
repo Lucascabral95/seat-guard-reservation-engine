@@ -1,11 +1,13 @@
 package handlers
 
 import (
-	"booking-service/internal/models"
-	"booking-service/internal/services"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
+
+	"booking-service/internal/models"
+	"booking-service/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stripe/stripe-go/v76"
@@ -28,48 +30,27 @@ type CreateCartCheckoutReq struct {
 	Items    []TicketItem `json:"items"`
 }
 
-// Inyectamos servicio de Seats
-type PaymentHandler struct {
-	seatService *services.SeatService
+type ResponseCartCheckoutReq struct {
+	OrderBookingId string       `json:"orderBookingId"`
+	UserId         string       `json:"userId"`
+	Currency       string       `json:"currency"`
+	Items          []TicketItem `json:"items"`
 }
 
-func NewPaymentHandlers(s *services.SeatService) *PaymentHandler {
-	return &PaymentHandler{seatService: s}
-}
-
-// Creamos el checkout session, y si alguna de las entradas está vendida (SOLD), se denegará la compra. Esto evita duplicados.
-func CreateCartCheckoutSession(seatService *services.SeatService) gin.HandlerFunc {
+func CreateCartCheckoutSession(seatService *services.SeatService, orderService *services.BookingOrderService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
+
+		stripeKey := os.Getenv("STRIPE_SECRET_KEY")
+		if stripeKey == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "STRIPE_SECRET_KEY missing"})
+			return
+		}
+		stripe.Key = stripeKey
 
 		var body CreateCartCheckoutReq
 		if err := c.ShouldBindJSON(&body); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body: " + err.Error()})
 			return
-		}
-
-		var eventID string
-
-		for _, item := range body.Items {
-			seatID := item.SeatIds.Id
-			if seatID != "" {
-				// 1. Consultamos al servicio (ahora tenemos acceso a seatService)
-				seat, err := seatService.GetSeat(seatID)
-				if err != nil {
-					c.JSON(http.StatusNotFound, gin.H{"error": "Seat not found: " + seatID})
-					return
-				}
-
-				if eventID == "" {
-					eventID = seat.EventID
-				}
-
-				// 2. Validamos estado
-				if seat.Status != models.StatusAvailable {
-					c.JSON(http.StatusConflict, gin.H{"error": "Seat/s is not available", "seatId": seatID})
-					return
-				}
-			}
 		}
 
 		if len(body.Items) == 0 {
@@ -84,22 +65,81 @@ func CreateCartCheckoutSession(seatService *services.SeatService) gin.HandlerFun
 
 		var lineItems []*stripe.CheckoutSessionLineItemParams
 		var allSeatIds []string
+		var totalAmount int64 = 0
+		var eventID string
+
+		var enrichedItems []TicketItem
 
 		for _, item := range body.Items {
+			seatID := item.SeatIds.Id
+			if seatID == "" {
+				continue
+			}
+
+			seat, err := seatService.GetSeat(seatID)
+			if err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Seat not found: " + seatID})
+				return
+			}
+
+			if eventID == "" {
+				eventID = seat.EventID
+			} else if eventID != seat.EventID {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot mix events"})
+				return
+			}
+
+			if seat.Status != models.StatusAvailable {
+				c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("Seat %s not available", seat.Number)})
+				return
+			}
+
+			realAmount := int64(seat.Price * 100)
+			realName := fmt.Sprintf("Asiento %s - %s", seat.Number, seat.Section)
+
+			totalAmount += realAmount
+			allSeatIds = append(allSeatIds, seatID)
+
+			// Bloqueo
+			seatService.LockSeat(seatID, body.UserId)
+
+			enrichedItems = append(enrichedItems, TicketItem{
+				Name:   realName,
+				Amount: realAmount,
+				SeatIds: SeatStruc{
+					Id: seatID,
+				},
+			})
+
 			lineItems = append(lineItems, &stripe.CheckoutSessionLineItemParams{
 				PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
 					Currency:   stripe.String(currency),
-					UnitAmount: stripe.Int64(item.Amount * 100),
+					UnitAmount: stripe.Int64(realAmount),
 					ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
-						Name: stripe.String(item.Name),
+						Name: stripe.String(realName),
 					},
 				},
 				Quantity: stripe.Int64(1),
 			})
+		}
 
-			if item.SeatIds.Id != "" {
-				allSeatIds = append(allSeatIds, item.SeatIds.Id)
-			}
+		if len(allSeatIds) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "No valid seats provided"})
+			return
+		}
+
+		body.Items = enrichedItems
+
+		order := &models.BookingOrder{
+			UserID:  body.UserId,
+			Status:  models.PaymentPending,
+			SeatIDs: allSeatIds,
+			Amount:  totalAmount,
+		}
+
+		if err := orderService.CreateBookingOrder(order); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
+			return
 		}
 
 		seatsMetadata := strings.Join(allSeatIds, ",")
@@ -107,16 +147,37 @@ func CreateCartCheckoutSession(seatService *services.SeatService) gin.HandlerFun
 			seatsMetadata = "many_seats_check_db"
 		}
 
+		baseURL := os.Getenv("STRIPE_SUCCESS_URL")
+		successURLWithParam := fmt.Sprintf("%s/dentro/checkout/success?session_id={CHECKOUT_SESSION_ID}&order_id=%s", baseURL, order.ID)
+		errorURL := fmt.Sprintf("%s/dentro/checkout/cancel", baseURL)
+
 		params := &stripe.CheckoutSessionParams{
-			Mode:       stripe.String(string(stripe.CheckoutSessionModePayment)),
-			LineItems:  lineItems,
-			SuccessURL: stripe.String(os.Getenv("STRIPE_SUCCESS_URL")),
-			CancelURL:  stripe.String(os.Getenv("STRIPE_CANCEL_URL")),
+			Mode:      stripe.String(string(stripe.CheckoutSessionModePayment)),
+			LineItems: lineItems,
+
+			SuccessURL: stripe.String(successURLWithParam),
+			CancelURL:  stripe.String(errorURL),
+			PaymentIntentData: &stripe.CheckoutSessionPaymentIntentDataParams{
+				Metadata: map[string]string{
+					"user_id":  body.UserId,
+					"seat_ids": seatsMetadata,
+					"event_id": eventID,
+					"order_id": order.ID,
+				},
+			},
 			Metadata: map[string]string{
 				"user_id":  body.UserId,
 				"seat_ids": seatsMetadata,
 				"event_id": eventID,
+				"order_id": order.ID,
 			},
+		}
+
+		responsePayload := &ResponseCartCheckoutReq{
+			OrderBookingId: order.ID,
+			UserId:         body.UserId,
+			Currency:       body.Currency,
+			Items:          body.Items,
 		}
 
 		s, err := checkoutsession.New(params)
@@ -125,6 +186,18 @@ func CreateCartCheckoutSession(seatService *services.SeatService) gin.HandlerFun
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"url": s.URL})
+		c.JSON(http.StatusOK, gin.H{
+			"url":          s.URL,
+			"dataCheckout": BuildCheckoutResponse(responsePayload),
+		})
+	}
+}
+
+func BuildCheckoutResponse(callback *ResponseCartCheckoutReq) gin.H {
+	return gin.H{
+		"orderBookingId": callback.OrderBookingId,
+		"userId":         callback.UserId,
+		"currency":       callback.Currency,
+		"items":          callback.Items,
 	}
 }

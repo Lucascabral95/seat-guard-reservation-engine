@@ -31,6 +31,18 @@ const (
 	AvailabilitySoldOut Availability = "SOLD_OUT"
 )
 
+type Gender string
+
+const (
+	Electronica Gender = "ELECTRONICA"
+	Rock        Gender = "ROCK"
+	Pop         Gender = "POP"
+	Jazz        Gender = "JAZZ"
+	Teatro      Gender = "TEATRO"
+	Varios      Gender = "VARIOS"
+	Metal       Gender = "METAL"
+)
+
 type BaseModel struct {
 	ID        string         `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 	CreatedAt time.Time      `json:"createdAt"`
@@ -47,6 +59,7 @@ type Event struct {
 	Date         time.Time    `json:"date"`
 	Price        int64        `gorm:"not null" json:"price"` // Precio base por entrada
 	PosterURL    string       `json:"posterUrl"`
+	Gender       string       `gorm:"type:varchar(20);default:'VARIOS'" json:"gender"`
 	Availability Availability `gorm:"type:varchar(20);default:'HIGH'" json:"availability"`
 
 	// Relación: Un evento tiene muchos asientos
@@ -72,6 +85,9 @@ type Seat struct {
 	// Relaciones
 	EventID  string  `gorm:"not null" json:"eventId"`
 	TicketID *string `json:"ticketId,omitempty"` // ID del ticket final si se vende
+
+	EventName string `gorm:"-" json:"eventName,omitempty"`
+	EventHour string `gorm:"-" json:"eventHour,omitempty"`
 }
 
 // --- PAGO / ORDEN ---
@@ -85,7 +101,29 @@ type BookingOrder struct {
 	// Asientos involucrados en esta orden
 	//SeatIDs []string `gorm:"type:text[]" json:"seatIds"`
 	SeatIDs []string `gorm:"serializer:json" json:"seatIds"`
+	Items   []Seat   `gorm:"-" json:"items,omitempty"`
 
 	// Token o ID de transacción de la pasarela de pago (Stripe/MercadoPago)
 	PaymentProviderID string `json:"paymentProviderId,omitempty"`
+	EventName         string `gorm:"-" json:"eventName,omitempty"`
+	EventHour         string `gorm:"-" json:"eventHour,omitempty"`
+}
+
+// Datos del usuario pagador
+type Checkout struct {
+	BaseModel
+
+	OrderID string       `gorm:"not null;index" json:"orderId"`
+	Order   BookingOrder `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+
+	PaymentProvider string `gorm:"type:varchar(50);default:'STRIPE'" json:"paymentProvider"`
+	PaymentIntentID string `gorm:"type:text;not null" json:"paymentIntentId"`
+
+	Currency string `gorm:"type:varchar(10);not null" json:"currency"`
+	Amount   int64  `gorm:"not null" json:"amount"`
+
+	CustomerEmail string `gorm:"type:text;not null" json:"customerEmail"`
+	CustomerName  string `gorm:"type:text;not null" json:"customerName"`
+
+	CustomerID *string `gorm:"type:varchar(50)" json:"customerId,omitempty"`
 }

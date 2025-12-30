@@ -257,7 +257,8 @@ resource "aws_lb_target_group" "booking" {
   target_type = "ip"
   
   health_check {
-    path    = "/api/v1/events" 
+    //path    = "/api/v1/events" 
+    path    = "/health" 
     matcher = "200-299"
   }
 

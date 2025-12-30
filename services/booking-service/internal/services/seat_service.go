@@ -11,11 +11,12 @@ import (
 )
 
 type SeatService struct {
-	repo repositories.SeatRepository
+	repo       repositories.SeatRepository
+	repoEvents repositories.EventRepository
 }
 
-func NewSeatService(repo repositories.SeatRepository) *SeatService {
-	return &SeatService{repo: repo}
+func NewSeatService(repo repositories.SeatRepository, repoEvents repositories.EventRepository) *SeatService {
+	return &SeatService{repo: repo, repoEvents: repoEvents}
 }
 
 func (s *SeatService) CreateSeat(seat *models.Seat) error {
@@ -41,6 +42,11 @@ func (s *SeatService) GetSeat(id string) (*models.Seat, error) {
 			return nil, utils.ErrSeatNotFound
 		}
 		return nil, err
+	}
+
+	event, err := s.repoEvents.FindByID(seat.EventID)
+	if err == nil && event != nil {
+		seat.EventName = event.Name
 	}
 
 	return seat, nil
@@ -76,7 +82,7 @@ func (s *SeatService) LockSeat(id string, userId string) error {
 		return errors.New("seat is not available")
 	}
 
-	// Bloquear por 15 minutos
-	expiresAt := time.Now().Add(15 * time.Minute)
+	// Bloquear por 10 minutos
+	expiresAt := time.Now().Add(10 * time.Minute)
 	return s.repo.LockSeat(id, userId, expiresAt)
 }

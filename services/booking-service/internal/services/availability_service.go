@@ -10,7 +10,10 @@ func UpdateEventAvailability(db *gorm.DB, eventID string) error {
 	var totalSeats int64
 	var availableSeats int64
 
-	if err := db.Model(&models.Seat{}).Where("event_id = ?", eventID).Count(&totalSeats).Error; err != nil {
+ if eventID == "" {
+ return nil
+ }
+ if err := db.Model(&models.Seat{}).Where("event_id = ?", eventID).Count(&totalSeats).Error; err != nil {
 		return err
 	}
 

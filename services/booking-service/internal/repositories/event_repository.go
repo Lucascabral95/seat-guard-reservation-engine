@@ -10,7 +10,7 @@ import (
 type EventRepository interface {
 	Create(event *models.Event) error
 	FindByID(id string) (*models.Event, error)
-	FindAll() ([]models.Event, error)
+	FindAll(filter models.EventFilter) ([]models.Event, error)
 	Update(event *models.Event) error
 	Delete(id string) error
 
@@ -40,9 +40,24 @@ func (r *eventRepository) FindByID(id string) (*models.Event, error) {
 	return &event, err
 }
 
-func (r *eventRepository) FindAll() ([]models.Event, error) {
+func (r *eventRepository) FindAll(filter models.EventFilter) ([]models.Event, error) {
 	var events []models.Event
-	err := r.db.Find(&events).Error
+
+	query := r.db.Model(&models.Event{})
+
+	if filter.Name != "" {
+		query = query.Where("name ILIKE ?", "%"+filter.Name+"%")
+	}
+
+	if filter.Gender != "" {
+		query = query.Where("gender = ?", filter.Gender)
+	}
+
+	if filter.Location != "" {
+		query = query.Where("location ILIKE ?", "%"+filter.Location+"%")
+	}
+
+	err := query.Find(&events).Error
 	return events, err
 }
 

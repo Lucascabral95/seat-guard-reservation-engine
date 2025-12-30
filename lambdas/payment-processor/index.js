@@ -5,16 +5,14 @@ const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
 const internalApiKey = process.env.INTERNAL_API_KEY || process.env.SECRET_X_INTERNAL_SECRET || "";
 
-console.log("🔑 Internal API Key configurada:", internalApiKey ? `SÍ (Longitud: ${internalApiKey.length})` : "NO");
-
-const defaultUrl = "http://monorepo-prod-alb-1569205323.us-east-1.elb.amazonaws.com:8080"; 
+const defaultUrl = "http://monorepo-prod-alb-895613190.us-east-1.elb.amazonaws.com:8080"; 
 const bookingServiceBaseUrl = (process.env.BOOKING_SERVICE_URL || defaultUrl).replace(/\/$/, "");
 
 console.log("🌐 URL base del servicio:", bookingServiceBaseUrl);
 
 const requestJson = async (method, url, body) => {
   const controller = new AbortController();
-  const timeoutMs = Number(process.env.HTTP_TIMEOUT_MS || 10000);
+  const timeoutMs = Number(process.env.HTTP_TIMEOUT_MS || 15000);
   const t = setTimeout(() => controller.abort(), timeoutMs);
 
   const headers = { "content-type": "application/json" };
@@ -22,7 +20,8 @@ const requestJson = async (method, url, body) => {
     headers["X-Internal-Secret"] = internalApiKey;
   }
 
-  console.log(`📡 Intentando ${method} a: ${url}`);
+  console.log(`📡 [${method}] ${url}`);
+  if (body) console.log(`📦 Payload:`, JSON.stringify(body));
 
   try {
     const res = await fetch(url, {
@@ -35,24 +34,22 @@ const requestJson = async (method, url, body) => {
     const text = await res.text();
     let json;
     try {
-      json = text ? JSON.parse(text) : undefined;
+      json = text ? JSON.parse(text) : {};
     } catch {
-      json = text;
+      json = { raw: text };
     }
 
     if (!res.ok) {
-      console.error(`❌ SERVER ERROR ${res.status} ${url}. Body:`, text);
-      const err = new Error(`HTTP ${res.status} ${method} ${url}`);
+      console.error(`❌ SERVER ERROR ${res.status} en ${url}. Respuesta:`, text);
+      const err = new Error(`HTTP_ERROR_${res.status}`);
       err.status = res.status;
       err.response = json;
-      throw err;
+      throw err; 
     }
 
     return json;
   } catch (error) {
-    console.error(`🔥 NETWORK ERROR en ${method} ${url}:`);
-    console.error(`   Mensaje: ${error.message}`);
-    if (error.cause) console.error(`   Causa:`, error.cause);
+    console.error(`🔥 NETWORK/FETCH ERROR en ${method} ${url}: ${error.message}`);
     throw error;
   } finally {
     clearTimeout(t);
@@ -60,146 +57,133 @@ const requestJson = async (method, url, body) => {
 };
 
 const parseSeatIds = (seatIdsRaw) => {
-  if (Array.isArray(seatIdsRaw)) {
-    return seatIdsRaw.map(String).map((s) => s.trim()).filter(Boolean);
-  }
-  if (typeof seatIdsRaw === "string") {
-    return seatIdsRaw.split(",").map((s) => String(s).trim()).filter(Boolean);
-  }
+  if (Array.isArray(seatIdsRaw)) return seatIdsRaw.map(String).map(s => s.trim()).filter(Boolean);
+  if (typeof seatIdsRaw === "string") return seatIdsRaw.split(",").map(s => String(s).trim()).filter(Boolean);
   return [];
 };
 
 const toPaymentStatus = (paymentStatusRaw) => {
   const s = String(paymentStatusRaw || "").toLowerCase();
-  if (s === "paid" || s === "complete" || s === "completed" || s === "succeeded") return "COMPLETED";
-  if (s === "failed" || s === "canceled" || s === "cancelled" || s === "unpaid") return "FAILED";
+  if (["paid", "complete", "completed", "succeeded"].includes(s)) return "COMPLETED";
+  if (["failed", "canceled", "cancelled", "unpaid"].includes(s)) return "FAILED";
   return "PENDING";
 };
 
 const normalizeMessage = (body) => {
-  if (body && typeof body === "object") {
-    if (body.userId && body.seatIds) {
-      return {
-        userId: String(body.userId),
-        amount: Number(body.amount || 0),
-        paymentStatus: body.status,
-        seatIds: parseSeatIds(body.seatIds),
-        eventId: body.eventId,
-        paymentProviderId: body.paymentProviderId || "",
-      };
-    }
-    if (body.type && body.data && body.data.object) {
-      const o = body.data.object;
-      const meta = (o && o.metadata) || {};
-      return {
-        userId: String(meta.user_id || ""),
-        amount: Number(o.amount_total || 0),
-        paymentStatus: o.payment_status,
-        seatIds: parseSeatIds(meta.seat_ids),
-        eventId: meta.event_id || "",
-        paymentProviderId: o.payment_intent || o.id || "",
-      };
-    }
+  if (body && body.userId) {
+    return {
+      userId: String(body.userId),
+      amount: Number(body.amount || 0),
+      paymentStatus: body.status, 
+      seatIds: parseSeatIds(body.seatIds),
+      eventId: body.eventId,
+      paymentProviderId: body.paymentProviderId || "",
+      orderId: body.orderId || "", 
+    };
+  }
+  if (body && body.type && body.data && body.data.object) {
+    const o = body.data.object;
+    const meta = (o && o.metadata) || {};
+    return {
+      userId: String(meta.user_id || ""),
+      amount: Number(o.amount_total || 0),
+      paymentStatus: o.payment_status,
+      seatIds: parseSeatIds(meta.seat_ids),
+      eventId: meta.event_id || "",
+      paymentProviderId: o.payment_intent || o.id || "",
+      orderId: meta.order_id || "", 
+    };
   }
   return null;
 };
 
-const ensureBookingService = () => {
-  if (!bookingServiceBaseUrl) {
-    throw new Error("BOOKING_SERVICE_BASE_URL no configurado y fallback vacío");
-  }
-};
-
 const markSeatsSold = async (seatIds) => {
-  ensureBookingService();
-  for (const seatId of seatIds) {
-    await requestJson("PATCH", `${bookingServiceBaseUrl}/api/v1/seats/${encodeURIComponent(seatId)}`, { status: "SOLD" });
-  }
-};
-
-const bookingOrderExists = async (paymentProviderId) => {
-  if (!paymentProviderId) return false;
-  ensureBookingService();
-  try {
-    const orders = await requestJson("GET", `${bookingServiceBaseUrl}/api/v1/booking-orders`);
-    if (!Array.isArray(orders)) return false;
-    return orders.some((o) => o && String(o.paymentProviderId || "") === String(paymentProviderId));
-  } catch (e) {
-    console.error("❌ Error verificando idempotencia (no crítico):", e.message);
-    return false;
-  }
-};
-
-const createBookingOrder = async ({ userId, amount, paymentStatus, seatIds, paymentProviderId }) => {
-  ensureBookingService();
-  return requestJson("POST", `${bookingServiceBaseUrl}/api/v1/booking-orders`, {
-    userId,
-    amount,
-    status: toPaymentStatus(paymentStatus),
-    seatIds,
-    paymentProviderId,
-  });
+  if (!seatIds.length) return;
+  const promises = seatIds.map(seatId => 
+    requestJson("PATCH", `${bookingServiceBaseUrl}/api/v1/seats/${encodeURIComponent(seatId)}`, { status: "SOLD" })
+  );
+  await Promise.all(promises);
 };
 
 const updateEventAvailability = async (eventID) => {
   if (!eventID) return;
-  ensureBookingService();
-  return requestJson("PATCH", `${bookingServiceBaseUrl}/api/v1/events/availability/${encodeURIComponent(eventID)}`);
+  try {
+      await requestJson("PATCH", `${bookingServiceBaseUrl}/api/v1/events/availability/${encodeURIComponent(eventID)}`);
+      console.log(`Availability updated for event: ${eventID}`);
+  } catch (e) {
+    console.warn("⚠️ Warning: Error updating availability (non-critical):", e.message);
+  }
+};
+
+const updateBookingOrder = async (orderId, status, paymentProviderId) => {
+  console.log(`🔄 Actualizando Orden ${orderId} -> Status: ${status}, ProviderID: ${paymentProviderId}`);
+  
+  const payload = {
+    status: status,
+    paymentProviderId: paymentProviderId 
+  };
+
+  return requestJson("PATCH", `${bookingServiceBaseUrl}/api/v1/booking-orders/${encodeURIComponent(orderId)}`, payload);
 };
 
 const processOne = async (rawBody) => {
   const msg = normalizeMessage(rawBody);
-  if (!msg) throw new Error("Mensaje no soportado");
-  if (!msg.userId) throw new Error("Falta userId");
-  if (!msg.seatIds || msg.seatIds.length === 0) throw new Error("Faltan seatIds");
-  
-  const shouldCheckIdempotency = String(process.env.ENABLE_IDEMPOTENCY_LOOKUP || "true").toLowerCase() !== "false";
-  const already = shouldCheckIdempotency ? await bookingOrderExists(msg.paymentProviderId) : false;
-
-  await markSeatsSold(msg.seatIds);
-  
-  if (!already) {
-    await createBookingOrder(msg);
+  if (!msg) {
+    console.error("Mensaje ignorado (formato desconocido):", JSON.stringify(rawBody));
+    return; 
   }
 
-  if (msg.eventId) {
-    try {
+  console.log("📨 Procesando mensaje normalizado:", JSON.stringify(msg));
+
+  if (!msg.seatIds || msg.seatIds.length === 0) {
+    console.error("❌ Mensaje sin seatIds, no se puede procesar.");
+    return;
+  }
+  
+  const currentStatus = toPaymentStatus(msg.paymentStatus);
+
+  if (currentStatus === "COMPLETED") {
+      console.log(`🎟️ Marcando ${msg.seatIds.length} asientos como SOLD...`);
+      await markSeatsSold(msg.seatIds);
       await updateEventAvailability(msg.eventId);
-      console.log(`Availability updated for event: ${msg.eventId}`);
-    } catch (e) {
-      console.error("Error updating availability (non-critical):", e.message);
-    }
+  } else {
+      console.log(`ℹ️ Estado de pago: ${currentStatus}. No se modifican asientos.`);
   }
 
-  return { alreadyProcessed: already };
+  if (msg.orderId) {
+      await updateBookingOrder(msg.orderId, currentStatus, msg.paymentProviderId);
+      console.log(`✅ Orden ${msg.orderId} actualizada correctamente.`);
+  } else {
+      console.error("⚠️ NO SE RECIBIÓ ORDER ID. Esto es inesperado si la orden se creó antes del pago.");
+  }
+
+  return { success: true };
 };
 
 exports.handler = async (event) => {
   console.log("🔔 Webhook/SQS Handler iniciado");
-
+  
   if (event.Records) {
     const batchItemFailures = [];
+    
     for (const record of event.Records) {
       try {
         const body = typeof record.body === "string" ? JSON.parse(record.body) : record.body;
-        console.log("📩 Mensaje SQS recibido:", JSON.stringify(body, null, 2));
         await processOne(body);
       } catch (err) {
-        console.error("❌ Error procesando mensaje SQS:", err.message);
-        if (record && record.messageId) {
-          batchItemFailures.push({ itemIdentifier: record.messageId });
-        }
+        console.error(`❌ Error procesando mensaje ${record.messageId}:`, err.message);
+        batchItemFailures.push({ itemIdentifier: record.messageId });
       }
     }
+    
     return { batchItemFailures };
   }
 
-  console.log("Evento directo (no SQS):", JSON.stringify(event));
   try {
     await processOne(event);
+    return { statusCode: 200, body: "OK" };
   } catch (err) {
-    console.error("❌ Error procesando evento directo:", err.message);
-    return { statusCode: 500, body: "ERROR" };
+    console.error("❌ Error fatal en invocación directa:", err);
+    return { statusCode: 500, body: err.message };
   }
-  return { statusCode: 200, body: "OK" };
 };

@@ -55,6 +55,8 @@ jobs:
         run: |
           npm ci
           npx prisma generate
+          # Validar test de Auth-service
+          npm run test
           npm run build
 
   # 2. ETAPA DE DESPLIEGUE (CD)

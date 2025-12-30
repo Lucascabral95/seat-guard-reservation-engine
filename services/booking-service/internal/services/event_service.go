@@ -42,8 +42,8 @@ func (s *EventService) GetEvent(id string) (*models.Event, error) {
 	return event, nil
 }
 
-func (s *EventService) GetAllEvents() ([]models.Event, error) {
-	return s.repo.FindAll()
+func (s *EventService) GetAllEvents(filter models.EventFilter) ([]models.Event, error) {
+	return s.repo.FindAll(filter)
 }
 
 func (s *EventService) UpdateEvent(id string, updatedData *models.Event) error {

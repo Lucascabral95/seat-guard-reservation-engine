@@ -9,6 +9,7 @@ const corsOptions = {
         'http://localhost:3001',
         'http://localhost:3002',
         'http://localhost:4000',
+        'http://localhost:4200',
         'http://localhost:5173',
         'https://doraemon-ecommerce-git-main-lucascabral95s-projects.vercel.app/',
         MY_URL_FRONTEND,
