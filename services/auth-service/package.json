@@ -83,6 +83,7 @@
     "testEnvironment": "node",
     "moduleNameMapper": {
       "^src/(.*)$": "<rootDir>/$1"
-    }
+    },
+    "setupFiles": ["<rootDir>/../jest.setup.ts"]
   }
 }

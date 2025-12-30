@@ -1,0 +1,6 @@
+process.env.NODE_ENV = 'test'
+process.env.PORT = '3000'
+process.env.DATABASE_URL = 'postgresql://dummy:dummy@localhost:5432/dummy'
+process.env.MY_FRONTEND_URL = 'http://localhost:3000'
+process.env.SECRET_JWT = 'test-secret'
+process.env.EXPIRED_TOKEN_JWT = '15m'
