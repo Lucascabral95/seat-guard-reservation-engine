@@ -27,7 +27,6 @@ const requestJson = async (method, url, body) => {
     const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: controller.signal });
     const text = await res.text();
     
-    // ✅ FIX: Parsing seguro. Si falla (ej: 404 text), guarda el texto crudo.
     let json;
     try {
         json = text ? JSON.parse(text) : {};
@@ -154,10 +153,27 @@ const createCheckout = async (orderId, data) => {
   console.log(`✅ Checkout: ${data.customerName} <${data.customerEmail}>`);
 };
 
-// ✅ FIX: RUTA CORREGIDA A /tickets/create
 const createTicket = async (orderId) => {
   await requestJson("POST", `${bookingServiceBaseUrl}/api/v1/tickets`, { orderId });
   console.log(`✅ Ticket creado para orden ${orderId}`);
+};
+
+// ============================================
+// ✅ NUEVO: ENVIAR EMAIL DE CONFIRMACIÓN
+// ============================================
+const sendPurchaseEmail = async (customer, orderId, amount) => {
+  try {
+    await requestJson("POST", `${bookingServiceBaseUrl}/api/v1/emails/send`, {
+      to: customer.email,
+      name: customer.name,
+      orderId: orderId,
+      amount: amount
+    });
+    console.log(`📧 Email enviado a ${customer.email}`);
+  } catch (error) {
+    // ⚠️ No bloqueante - si falla el email, la orden ya está procesada
+    console.error(`❌ Error enviando email (non-critical): ${error.message}`);
+  }
 };
 
 // ============================================
@@ -188,8 +204,10 @@ const processOne = async (rawBody) => {
     return;
   }
 
+  // Obtener datos del cliente desde Stripe
   const customer = await getCustomerDataFromStripe(msg.paymentProviderId);
 
+  // Procesar orden
   await updateBookingOrder(msg.orderId, status, msg.paymentProviderId);
   await markSeatsSold(msg.seatIds);
   await updateEventAvailability(msg.eventId);
@@ -204,6 +222,8 @@ const processOne = async (rawBody) => {
   });
   
   await createTicket(msg.orderId);
+
+  await sendPurchaseEmail(customer, msg.orderId, msg.amount);
 
   console.log(`✅ Orden ${msg.orderId} procesada completamente`);
 };
