@@ -4,43 +4,39 @@ const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
 const internalApiKey = process.env.INTERNAL_API_KEY || process.env.SECRET_X_INTERNAL_SECRET || "";
-
 const defaultUrl = "http://monorepo-prod-alb-895613190.us-east-1.elb.amazonaws.com:8080"; 
 const bookingServiceBaseUrl = (process.env.BOOKING_SERVICE_URL || defaultUrl).replace(/\/$/, "");
 
-console.log("🌐 URL base del servicio:", bookingServiceBaseUrl);
+console.log("🌐 Booking Service URL:", bookingServiceBaseUrl);
 
+// ============================================
+// HTTP REQUEST (MEJORADO PARA NO FALLAR CON 404)
+// ============================================
 const requestJson = async (method, url, body) => {
   const controller = new AbortController();
   const timeoutMs = Number(process.env.HTTP_TIMEOUT_MS || 15000);
   const t = setTimeout(() => controller.abort(), timeoutMs);
 
   const headers = { "content-type": "application/json" };
-  if (internalApiKey) {
-    headers["X-Internal-Secret"] = internalApiKey;
-  }
+  if (internalApiKey) headers["X-Internal-Secret"] = internalApiKey;
 
   console.log(`📡 [${method}] ${url}`);
-  if (body) console.log(`📦 Payload:`, JSON.stringify(body));
+  if (body) console.log(`📦`, JSON.stringify(body, null, 2));
 
   try {
-    const res = await fetch(url, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: controller.signal,
-    });
-
+    const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: controller.signal });
     const text = await res.text();
+    
+    // ✅ FIX: Parsing seguro. Si falla (ej: 404 text), guarda el texto crudo.
     let json;
     try {
-      json = text ? JSON.parse(text) : {};
-    } catch {
-      json = { raw: text };
+        json = text ? JSON.parse(text) : {};
+    } catch (e) {
+        json = { rawResponse: text };
     }
 
     if (!res.ok) {
-      console.error(`❌ SERVER ERROR ${res.status} en ${url}. Respuesta:`, text);
+      console.error(`❌ HTTP ${res.status}:`, text);
       const err = new Error(`HTTP_ERROR_${res.status}`);
       err.status = res.status;
       err.response = json;
@@ -49,141 +45,189 @@ const requestJson = async (method, url, body) => {
 
     return json;
   } catch (error) {
-    console.error(`🔥 NETWORK/FETCH ERROR en ${method} ${url}: ${error.message}`);
+    console.error(`🔥 ERROR: ${error.message}`);
     throw error;
   } finally {
     clearTimeout(t);
   }
 };
 
-const parseSeatIds = (seatIdsRaw) => {
-  if (Array.isArray(seatIdsRaw)) return seatIdsRaw.map(String).map(s => s.trim()).filter(Boolean);
-  if (typeof seatIdsRaw === "string") return seatIdsRaw.split(",").map(s => String(s).trim()).filter(Boolean);
+// ============================================
+// OBTENER DATOS DEL CLIENTE DESDE STRIPE
+// ============================================
+const getCustomerDataFromStripe = async (paymentIntentId) => {
+  if (!stripe || !paymentIntentId) {
+    console.warn("⚠️ Stripe no disponible");
+    return { email: "noreply@booking.com", name: "Cliente" };
+  }
+
+  try {
+    console.log(`🔍 Consultando PaymentIntent: ${paymentIntentId}`);
+    
+    const pi = await stripe.paymentIntents.retrieve(paymentIntentId, {
+      expand: ['customer', 'latest_charge']
+    });
+    
+    let email = null;
+    let name = null;
+
+    if (pi.latest_charge?.billing_details) {
+      email = pi.latest_charge.billing_details.email;
+      name = pi.latest_charge.billing_details.name;
+    }
+
+    if (!email && pi.customer && typeof pi.customer === 'object') {
+      email = pi.customer.email;
+      name = pi.customer.name;
+    }
+
+    if (!email) email = pi.receipt_email;
+
+    if (!name && email) name = email.split('@')[0].replace(/[._-]/g, ' ');
+
+    console.log(`✅ Cliente: ${name} <${email}>`);
+
+    return {
+      email: email || "noreply@booking.com",
+      name: name || "Cliente",
+      customerId: typeof pi.customer === 'string' ? pi.customer : null
+    };
+
+  } catch (error) {
+    console.error(`❌ Error Stripe: ${error.message}`);
+    return { email: "noreply@booking.com", name: "Cliente", customerId: null };
+  }
+};
+
+// ============================================
+// UTILS
+// ============================================
+const parseSeatIds = (raw) => {
+  if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
+  if (typeof raw === "string") return raw.split(",").map(s => s.trim()).filter(Boolean);
   return [];
 };
 
-const toPaymentStatus = (paymentStatusRaw) => {
-  const s = String(paymentStatusRaw || "").toLowerCase();
+const toPaymentStatus = (raw) => {
+  const s = String(raw || "").toLowerCase();
   if (["paid", "complete", "completed", "succeeded"].includes(s)) return "COMPLETED";
-  if (["failed", "canceled", "cancelled", "unpaid"].includes(s)) return "FAILED";
+  if (["failed", "canceled", "cancelled"].includes(s)) return "FAILED";
   return "PENDING";
 };
 
-const normalizeMessage = (body) => {
-  if (body && body.userId) {
-    return {
-      userId: String(body.userId),
-      amount: Number(body.amount || 0),
-      paymentStatus: body.status, 
-      seatIds: parseSeatIds(body.seatIds),
-      eventId: body.eventId,
-      paymentProviderId: body.paymentProviderId || "",
-      orderId: body.orderId || "", 
-    };
-  }
-  if (body && body.type && body.data && body.data.object) {
-    const o = body.data.object;
-    const meta = (o && o.metadata) || {};
-    return {
-      userId: String(meta.user_id || ""),
-      amount: Number(o.amount_total || 0),
-      paymentStatus: o.payment_status,
-      seatIds: parseSeatIds(meta.seat_ids),
-      eventId: meta.event_id || "",
-      paymentProviderId: o.payment_intent || o.id || "",
-      orderId: meta.order_id || "", 
-    };
-  }
-  return null;
+// ============================================
+// OPERACIONES
+// ============================================
+const updateBookingOrder = async (orderId, status, paymentProviderId) => {
+  await requestJson("PATCH", `${bookingServiceBaseUrl}/api/v1/booking-orders/${orderId}`, {
+    status, paymentProviderId
+  });
 };
 
 const markSeatsSold = async (seatIds) => {
   if (!seatIds.length) return;
-  const promises = seatIds.map(seatId => 
-    requestJson("PATCH", `${bookingServiceBaseUrl}/api/v1/seats/${encodeURIComponent(seatId)}`, { status: "SOLD" })
-  );
-  await Promise.all(promises);
+  await Promise.all(seatIds.map(id => 
+    requestJson("PATCH", `${bookingServiceBaseUrl}/api/v1/seats/${id}`, { status: "SOLD" })
+  ));
 };
 
-const updateEventAvailability = async (eventID) => {
-  if (!eventID) return;
+const updateEventAvailability = async (eventId) => {
+  if (!eventId) return;
   try {
-      await requestJson("PATCH", `${bookingServiceBaseUrl}/api/v1/events/availability/${encodeURIComponent(eventID)}`);
-      console.log(`Availability updated for event: ${eventID}`);
+    await requestJson("PATCH", `${bookingServiceBaseUrl}/api/v1/events/availability/${eventId}`);
   } catch (e) {
-    console.warn("⚠️ Warning: Error updating availability (non-critical):", e.message);
+    console.warn("⚠️ Availability update failed (non-critical)");
   }
 };
 
-const updateBookingOrder = async (orderId, status, paymentProviderId) => {
-  console.log(`🔄 Actualizando Orden ${orderId} -> Status: ${status}, ProviderID: ${paymentProviderId}`);
-  
-  const payload = {
-    status: status,
-    paymentProviderId: paymentProviderId 
+const createCheckout = async (orderId, data) => {
+  await requestJson("POST", `${bookingServiceBaseUrl}/api/v1/checkouts`, {
+    orderId,
+    paymentProvider: "STRIPE",
+    paymentIntentId: data.paymentProviderId,
+    currency: data.currency || "usd",
+    amount: data.amount,
+    customerEmail: data.customerEmail,
+    customerName: data.customerName,
+    customerId: data.customerId
+  });
+  console.log(`✅ Checkout: ${data.customerName} <${data.customerEmail}>`);
+};
+
+// ✅ FIX: RUTA CORREGIDA A /tickets/create
+const createTicket = async (orderId) => {
+  await requestJson("POST", `${bookingServiceBaseUrl}/api/v1/tickets`, { orderId });
+  console.log(`✅ Ticket creado para orden ${orderId}`);
+};
+
+// ============================================
+// PROCESAMIENTO
+// ============================================
+const processOne = async (rawBody) => {
+  const msg = {
+    userId: rawBody.userId,
+    amount: Number(rawBody.amount || 0),
+    paymentStatus: rawBody.status,
+    seatIds: parseSeatIds(rawBody.seatIds),
+    eventId: rawBody.eventId,
+    paymentProviderId: rawBody.paymentProviderId,
+    orderId: rawBody.orderId,
+    currency: rawBody.currency || "usd"
   };
 
-  return requestJson("PATCH", `${bookingServiceBaseUrl}/api/v1/booking-orders/${encodeURIComponent(orderId)}`, payload);
-};
-
-const processOne = async (rawBody) => {
-  const msg = normalizeMessage(rawBody);
-  if (!msg) {
-    console.error("Mensaje ignorado (formato desconocido):", JSON.stringify(rawBody));
-    return; 
-  }
-
-  console.log("📨 Procesando mensaje normalizado:", JSON.stringify(msg));
-
-  if (!msg.seatIds || msg.seatIds.length === 0) {
-    console.error("❌ Mensaje sin seatIds, no se puede procesar.");
+  if (!msg.orderId || !msg.seatIds.length) {
+    console.error("❌ Mensaje inválido");
     return;
   }
+
+  const status = toPaymentStatus(msg.paymentStatus);
+  console.log(`📊 Status: ${status}`);
+
+  if (status !== "COMPLETED") {
+    console.log("ℹ️ Pago no completado, ignorando");
+    return;
+  }
+
+  const customer = await getCustomerDataFromStripe(msg.paymentProviderId);
+
+  await updateBookingOrder(msg.orderId, status, msg.paymentProviderId);
+  await markSeatsSold(msg.seatIds);
+  await updateEventAvailability(msg.eventId);
   
-  const currentStatus = toPaymentStatus(msg.paymentStatus);
+  await createCheckout(msg.orderId, {
+    paymentProviderId: msg.paymentProviderId,
+    currency: msg.currency,
+    amount: msg.amount,
+    customerEmail: customer.email,
+    customerName: customer.name,
+    customerId: customer.customerId
+  });
+  
+  await createTicket(msg.orderId);
 
-  if (currentStatus === "COMPLETED") {
-      console.log(`🎟️ Marcando ${msg.seatIds.length} asientos como SOLD...`);
-      await markSeatsSold(msg.seatIds);
-      await updateEventAvailability(msg.eventId);
-  } else {
-      console.log(`ℹ️ Estado de pago: ${currentStatus}. No se modifican asientos.`);
-  }
-
-  if (msg.orderId) {
-      await updateBookingOrder(msg.orderId, currentStatus, msg.paymentProviderId);
-      console.log(`✅ Orden ${msg.orderId} actualizada correctamente.`);
-  } else {
-      console.error("⚠️ NO SE RECIBIÓ ORDER ID. Esto es inesperado si la orden se creó antes del pago.");
-  }
-
-  return { success: true };
+  console.log(`✅ Orden ${msg.orderId} procesada completamente`);
 };
 
+// ============================================
+// HANDLER
+// ============================================
 exports.handler = async (event) => {
-  console.log("🔔 Webhook/SQS Handler iniciado");
+  console.log("🔔 Lambda iniciada");
   
   if (event.Records) {
-    const batchItemFailures = [];
-    
+    const failures = [];
     for (const record of event.Records) {
       try {
         const body = typeof record.body === "string" ? JSON.parse(record.body) : record.body;
         await processOne(body);
       } catch (err) {
-        console.error(`❌ Error procesando mensaje ${record.messageId}:`, err.message);
-        batchItemFailures.push({ itemIdentifier: record.messageId });
+        console.error(`❌ Error:`, err.message);
+        failures.push({ itemIdentifier: record.messageId });
       }
     }
-    
-    return { batchItemFailures };
+    return { batchItemFailures: failures };
   }
 
-  try {
-    await processOne(event);
-    return { statusCode: 200, body: "OK" };
-  } catch (err) {
-    console.error("❌ Error fatal en invocación directa:", err);
-    return { statusCode: 500, body: err.message };
-  }
+  await processOne(event);
+  return { statusCode: 200, body: "OK" };
 };

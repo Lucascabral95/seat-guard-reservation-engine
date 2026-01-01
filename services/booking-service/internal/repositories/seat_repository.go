@@ -3,6 +3,7 @@ package repositories
 import (
 	"booking-service/internal/models"
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -17,6 +18,8 @@ type SeatRepository interface {
 	UnlockIfExpired(id string, now time.Time) error
 
 	FindSeatByEventId(id string) ([]models.Seat, error)
+
+	FindByIDs(ids []string) ([]models.Seat, error)
 }
 
 type seatRepository struct {
@@ -93,4 +96,24 @@ func (r *seatRepository) FindSeatByEventId(eventId string) ([]models.Seat, error
 	var seats []models.Seat
 	err := r.db.Where("event_id = ?", eventId).Find(&seats).Error
 	return seats, err
+}
+
+// Muestra los datos de todos los asientos por IDs
+func (r *seatRepository) FindByIDs(ids []string) ([]models.Seat, error) {
+	if len(ids) == 0 {
+		return []models.Seat{}, nil
+	}
+
+	var seats []models.Seat
+
+	err := r.db.Where("id IN ? AND deleted_at IS NULL", ids).Find(&seats).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to find seats by IDs: %w", err)
+	}
+
+	if len(seats) != len(ids) {
+		return seats, fmt.Errorf("some seats were not found: expected %d, got %d", len(ids), len(seats))
+	}
+
+	return seats, nil
 }

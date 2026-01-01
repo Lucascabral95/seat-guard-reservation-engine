@@ -27,7 +27,7 @@ func ResetAndSeed(db *gorm.DB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 
 		if err := tx.Exec(`
-            TRUNCATE TABLE seats, events, booking_orders, checkouts
+            TRUNCATE TABLE seats, events, booking_orders, checkouts, ticket_pdfs
             RESTART IDENTITY CASCADE;
         `).Error; err != nil {
 			return err

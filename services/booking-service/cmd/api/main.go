@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"strconv"
 
 	"booking-service/internal/config"
 	"booking-service/internal/database"
@@ -59,6 +60,36 @@ func main() {
 	checkoutRepo := repositories.NewCheckoutRepository(db)
 	checkoutService := services.NewCheckoutService(checkoutRepo)
 	checkoutHandler := handlers.NewCheckoutHandler(checkoutService)
+
+	// Ticket
+	ticketRepo := repositories.NewTicketRepository(db)
+	ticketService := services.NewTicketService(ticketRepo, bookingOrderRepo, seatRepo, eventRepo)
+	pdfService := services.NewPDFService()
+	ticketHandler := handlers.NewTicketHandler(ticketService, pdfService, bookingOrderService, checkoutService)
+
+	// Emails
+	// Emails
+	// Emails
+	host := cfg.Smtp_Host
+	port := cfg.Smtp_Port
+	user := cfg.Smtp_User
+	pass := cfg.Smtp_Pass
+	from := cfg.Smtp_From
+	workers := cfg.Workers
+	workersInt, err := strconv.Atoi(workers)
+	if err != nil {
+		log.Fatalf("Invalid WORKERS: %v", err)
+	}
+	// ---
+	emailRepo, err := repositories.NewEmailRepository(host, port, user, pass, from)
+	if err != nil {
+		log.Fatalf("❌ Failed to initialize email repository: %v", err)
+	}
+	emailService := services.NewEmailService(emailRepo, workersInt)
+	emailHandler := handlers.NewEmailHandler(emailService)
+	// Emails
+	// Emails
+	// Emails
 
 	// Queue AWS SQS
 	ctx := context.Background()
@@ -128,6 +159,33 @@ func main() {
 		stripe := v1.Group("/stripe")
 		{
 			stripe.POST("/create/checkout/session", guardUserJWT, handlers.CreateCartCheckoutSession(seatService, bookingOrderService))
+		}
+		// ✅ Generacion de ticket (NUEVO)
+		tickets := v1.Group("/tickets")
+		{
+			// Crear Ticket para PDF
+			tickets.POST("/", guardUserJWT, ticketHandler.CreateTicketFromEndpoint)
+			// Obtener metadata del ticket
+			tickets.GET("/:orderID", guardUserJWT, ticketHandler.GetTicketMetadata)
+			// Descargar PDF del ticket (sin Bearer token)
+			tickets.GET("/:orderID/download", ticketHandler.DownloadTicketPDF)
+			// Regenerar PDF
+			tickets.POST("/:orderID/regenerate", guardUserJWT, ticketHandler.RegenerateTicketPDF)
+			// Admin: obtener todos los tickets
+			tickets.GET("", guardUserJWT, ticketHandler.GetAllTickets)
+			// Admin: obtener ticket por ID
+			tickets.GET("/by-id/:ticketID", guardUserJWT, ticketHandler.GetTicketByID)
+			// Admin: eliminar ticket
+			tickets.DELETE("/:orderID", guardUserJWT, ticketHandler.DeleteTicket)
+		}
+		emails := v1.Group("/emails")
+		{
+			// Mandar un solo email (instantaneamente)
+			emails.POST("/send", guardUserJWT, emailHandler.SendSync)
+			// Mandar varios emails (masivo)
+			emails.POST("/send-bulk", guardUserJWT, emailHandler.SendBulk)
+			// Mandar varios emails en segundo plano (asíncrono, en cola)
+			emails.POST("/send-bulk-async", guardUserJWT, emailHandler.SendAsync)
 		}
 	}
 

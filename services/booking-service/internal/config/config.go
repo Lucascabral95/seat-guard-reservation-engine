@@ -24,6 +24,13 @@ type Config struct {
 	SQSQueueUrl string
 
 	StripeSecretKey string
+
+	Smtp_Host string
+	Smtp_Port string
+	Smtp_User string
+	Smtp_Pass string
+	Smtp_From string
+	Workers   string
 }
 
 func LoadConfig() *Config {
@@ -48,6 +55,14 @@ func LoadConfig() *Config {
 		SQSQueueUrl: getEnv("SQS_QUEUE_URL", "sdsdsdsdsd"),
 
 		StripeSecretKey: getEnv("STRIPE_SECRET_KEY", "sk_test_XXXXXXXXXXXXXXXXXXXX"),
+
+		// Agregarles en vars de Terraform!!!! ⚠️
+		Smtp_Host: getEnv("SMTP_HOST", "smtp.gmail.com"),
+		Smtp_Port: getEnv("SMTP_PORT", "587"),
+		Smtp_User: getEnv("SMTP_USER", ""),
+		Smtp_Pass: getEnv("SMTP_PASS", ""),
+		Smtp_From: getEnv("SMTP_FROM", getEnv("EMAIL_FROM", "")),
+		Workers:   getEnv("WORKERS", "10"),
 	}
 }
 
