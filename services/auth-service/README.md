@@ -21,78 +21,153 @@
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-## Description
+## Auth Service — SeatGuard
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Versión profesional y centrada del servicio de autenticación del monorepo SeatGuard. Este servicio gestiona registros, inicio de sesión, emisión y validación de JWT y la integración con la capa de persistencia (Prisma/Postgres).
 
-## Project setup
+## Estado
 
-```bash
-$ npm install
+- Stack: NestJS + TypeScript
+- ORM: Prisma
+- Entrypoint: `src/main.ts`
+
+## Objetivo
+
+Proveer un servicio seguro y escalable para la gestión de identidades que soporte:
+- Registro de usuarios
+- Inicio de sesión (login) con hashing seguro de contraseñas
+- Emisión y verificación de tokens JWT
+- Endpoints protegidos por guardas de autorización
+
+## Características principales
+
+- Autenticación basada en JWT con expiración configurable.
+- Validaciones estrictas de input usando DTOs.
+- Integración directa con Prisma para abstracción de base de datos.
+- Modularidad: `auth` y `prisma` son módulos independientes y testeables.
+- Buenas prácticas de seguridad (hash de contraseñas, validadores, manejo de errores de Prisma centralizado).
+
+## Estructura relevante
+
+- `src/auth/` — controladores, servicios, guards y DTOs.
+- `src/prisma/` — módulo y servicio de Prisma.
+- `src/main.ts` — bootstrap de la app.
+- `prisma/schema.prisma` — modelo de datos.
+
+## Requisitos locales
+
+- Node.js 18+
+- npm o yarn
+- Base de datos PostgreSQL accesible (Neon o similar)
+
+## Configuración de entorno
+
+Copiar `.env.template` a `.env` y rellenar las variables necesarias. Variables principales:
+
+- `PORT` — Puerto en el que corre el microservicio.
+- `DATABASE_URL` — URL de conexión a Postgres (formato Prisma).
+- `MY_FRONTEND_URL` — URL del frontend para configurar CORS.
+- `SECRET_JWT` — secreto para firmar JWT.
+- `NODE_ENV` — Debe ser 'development' o 'production', segun tu entorno actual.
+- `EXPIRED_TOKEN_JWT` — duración por defecto del token (ej. `30d`).
+
+Ejemplo mínimo de `.env`:
+
+```env
+PORT=3000
+DATABASE_URL="postgresql://user:password@host:5432/auth_db?schema=public"
+MY_FRONTEND_URL="http://localhost:4200"
+SECRET_JWT="replace_with_a_strong_secret"
+NODE_ENV="development"
+EXPIRED_TOKEN_JWT="30d"
 ```
 
-## Compile and run the project
+## Scripts útiles
+
+- `npm install` — instala dependencias.
+- `npm run start` — ejecuta en modo producción.
+- `npm run start:dev` — modo desarrollo (watch).
+- `npm run test` — ejecuta tests unitarios.
+- `npm run test:e2e` — tests e2e.
+
+Revisa el `package.json` para más detalles.
+
+## Docker
+
+El servicio incluye un `Dockerfile` para construir una imagen lista para ECS/Fargate o pruebas locales.
+
+Ejemplo de build y run local (sin Docker Compose):
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+docker build -t seatguard-auth:local .
+docker run --env-file .env -p 3000:3000 seatguard-auth:local
 ```
 
-## Run tests
+## API principal (resumen)
+
+Nota: las rutas pueden estar prefijadas por la configuración del router en `src/main.ts`.
+
+- POST `/auth/register` — Registrar usuario (body: `email`, `password`, `name`).
+- POST `/auth/login` — Autenticar y recibir `accessToken` (body: `email`, `password`).
+- GET `/auth/profile` — Obtener perfil (requiere `Authorization: Bearer <token>`).
+
+Ejemplo cURL de login:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"MyP@ssw0rd"}'
 ```
 
-## Deployment
+## Seguridad y buenas prácticas implementadas
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+- Contraseñas almacenadas usando bcrypt con sal.
+- Tokens JWT firmados con `SECRET_JWT` y expiración configurable.
+- Guardas (`AuthGuard`) protegiendo rutas privadas.
+- Manejo centralizado de errores de Prisma en `src/errors/handler-prisma-error.ts`.
+- Validadores personalizados (ej. contraseña fuerte) en `src/common/validators`.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Desarrollo y pruebas
+
+1. Configurar `.env` con `DATABASE_URL` apuntando a una DB de desarrollo.
+2. Ejecutar migraciones/seed de Prisma si aplica:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npx prisma migrate deploy
+npx prisma db seed
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+3. Ejecutar la app en modo desarrollo:
 
-## Resources
+```bash
+npm run start:dev
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+4. Ejecutar tests unitarios:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```bash
+npm run test
+```
 
-## Support
+## Observabilidad
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+- Logs estándar via `console` y NestJS logger.
+- Instrumentación y métricas pueden agregarse en `src/main.ts` según la plataforma de despliegue.
 
-## Stay in touch
+## Despliegue
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- El servicio está preparado para ejecutarse en contenedores y desplegarse en ECS/Fargate.
+- Asegúrate de inyectar las variables de entorno sensibles (`DATABASE_URL`, `SECRET_JWT`) en el entorno de producción.
 
-## License
+## Contribuir
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- Seguir las convenciones de commits (Conventional Commits).
+- Añadir pruebas para nueva lógica en `src/auth`.
+
+## Contacto
+
+- Autor del repositorio: Lucas Cabral — lucassimple@hotmail.com
+
+---
+
+Archivo actualizado: [services/auth-service/README.md](services/auth-service/README.md)

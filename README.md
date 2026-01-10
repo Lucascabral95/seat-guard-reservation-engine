@@ -57,49 +57,60 @@ El backend está construido con un stack tecnológico moderno que incluye **Go (
 <a id="️arquitectura-del-sistema"></a>
 ## 🏛️ Arquitectura del sistema
 
+<p align="center">                 
+  <img src="./docs/diagrama-arquitectura-de-microservicios-seat-guards-dark.png"
+       alt="Arquitectura completa de SeatGuard en AWS"
+       width="100%"/>
+</p> 
+
 El siguiente diagrama ilustra el flujo de datos y la interacción entre los componentes de la plataforma:
 
 ```
 graph TD
-    subgraph "Cliente"
-        Client["Usuario Final"]
-    end
+    participant C as 👤 Cliente
+    participant ALB as ⚖️ ALB
+    participant Auth as 🔐 Auth Service
+    participant Booking as 🎟️ Booking Service
+    participant DB as 🗄️ PostgreSQL
+    participant Stripe as 💳 Stripe
+    participant SQS as 📬 SQS
+    participant Lambda as ⚡ Lambda
+    participant Email as 📧 Email Worker
 
-    subgraph "AWS Cloud"
-        ALB["Application Load Balancer"]
+    C->>ALB: 1. POST /auth/login
+    ALB->>Auth: Reenvía solicitud
+    Auth->>DB: Valida credenciales
+    DB-->>Auth: Datos de usuario
+    Auth-->>C: 2. JWT Token
 
-        subgraph "Amazon ECS (Fargate)"
-            AuthService["Auth Service (NestJS)"]
-            BookingService["Booking Service (Go)"]
-        end
+    C->>ALB: 3. POST /api/v1/seats/lock/:id/uid/:uid (+ JWT)
+    ALB->>Booking: Reenvía solicitud
+    Booking->>DB: Bloquea asientos (15 min)
+    DB-->>Booking: Asientos bloqueados
+    Booking-->>C: Confirmación de bloqueo
 
-        subgraph "Cloud Database"
-            NeonDB["Neon Tech PostgreSQL"]
-        end
+    C->>Booking: 4. POST /api/v1/stripe/create/checkout/sesion
+    Booking->>Stripe: 5. Crea sesión (solo si todos los asientos estan con estado AVAILABLE)
+    Stripe-->>Booking: URL de Checkout
+    Booking-->>C: 6. URL de redirección
 
-        subgraph "Procesamiento Asíncrono"
-            SQS[SQS Queue]
-            Lambda["Payment Processor Lambda"]
-        end
+    Booking-->C: 7. Crea orden de pago con los detalles, en estado PENDING
+  
+    C->>Stripe: 8. Completa el pago
+    Stripe->>Booking: 9. Webhook (payment.success)
+    Booking->>SQS: 10. Encola mensaje en /api/v1/sqs/messaging
+    
+    Lambda->>SQS: 11. Consulta mensaje
+    Lambda->>Booking: 12. PATCH /api/v1/seats/:id
+    Booking->>DB: 13. Marca asientos como VENDIDOS
+    
+    Lambda->>Booking: 14. POST /api/v1/tickets
+    Booking->>DB: 15. Crea ticket en formato PDF con detalles de la compra
 
-        subgraph "Pasarela de Pagos Externa"
-            Stripe["Stripe API"]
-            StripeWebhook["Stripe Webhook"]
-        end
-    end
+    Booking->>Email: 16. Encola email
+    Email->>C: 17. Email de confirmación
 
-    Client -- HTTPS --> ALB
-    ALB -- :80/auth/* --> AuthService
-    ALB -- :8080/api/v1/* --> BookingService
-
-    AuthService <--> NeonDB
-    BookingService <--> NeonDB
-
-    BookingService -- Crea Sesión de Pago --> Stripe
-    StripeWebhook -- Evento de Pago --> Booking Service
-    Lambda -- Lee Mensaje --> SQS
-    Lambda -- Actualiza Estado --> BookingService
-    BookingService -- Recalcula Disponibilidad --> NeonDB
+    Note over C,Email: ✅ Transacción completada
 ``` 
 
 ## Flujo de datos
@@ -109,16 +120,20 @@ graph TD
 
 - **Pago**: Se inicia una sesión de checkout en Stripe.
 
+- **Creacion de orden de compra**: Se crea una orden de compra en el Booking Service con estado `PENDING`.
+
 - **Confirmación asíncrona**:
   - **Notificación de pago**: Stripe envía un webhook al Booking Service cuando se completa un pago.
   - **Cola de mensajes**: El mensaje se encola automáticamente en SQS para garantizar la entrega.
   - **Procesamiento**: La Lambda consume el mensaje de la cola y:
     - Valida el pago con Stripe
     - Marca los asientos como `SOLD` en la base de datos
-    - Crea la orden de compra en el Booking Service
+    - Marca la orden como `COMPLETED`
     - Actualiza la disponibilidad del evento
+    - Crea el ticket en formato PDF con detalles de la compra
+    - Manda un email de confirmación al usuario con indicaciones para vaya a descargar el comprobante en la página.
   - **Notificación al usuario**: Se envía confirmación al usuario (opcional, vía email/websocket)
-  - **Manejo de errores**: Si falla algún paso, el mensaje vuelve a la cola para reintento.
+  - **Manejo de errores**: Si falla algún paso, el mensaje vuelve a la cola para reintento. Si falla un paso, fallan todos.
 
 ## Estructura del proyecto
 ```
@@ -134,9 +149,18 @@ seatguard-monorepo/
 │   │   └── Dockerfile
 │   └── booking-service/             # Motor de Reservas (Go)
 │       ├── cmd/                     # Punto de entrada
+│       ├── pkg/                     # Paquetes reutilizables y librerías
 │       ├── internal/                # Lógica de negocio (Dominios, Servicios, Repos)
+│       │   ├── config/              # Configuraciones
+│       │   ├── database/            # Conexión a DB, migraciones y seeding
+│       │   ├── handlers/            # HTTP handlers
+│       │   └── messaging/           # SQS client
+│       │   └── middleware/          # Middlewares (Auth, Logging, CORS)
+│       │   └── models/              # Modelos de datos
+│       │   ├── services/            # Servicios (Email, Booking, etc.)
+│       │   ├── repositories/        # Capa de persistencia
 │       └── Dockerfile
-├── scripts/                         # Scripts de utilidad (Deploy, Build)
+├── scripts/                         # Scripts de utilidad (Deploy, Build, Test, Docker compose)
 ├── docker-compose.yml               # Orquestación local
 └── README2.md                       # Documentación
 ```
@@ -149,6 +173,7 @@ seatguard-monorepo/
 
 - **Ruta**: `services/auth-service`
 - **Stack**: NestJS, TypeScript, Prisma ORM, JWT
+- **Puerto**: 3000
 - **Función**: Gestión de identidades, registro y emisión de tokens JWT.
 
 <a id="booking-service"></a>
@@ -156,17 +181,19 @@ seatguard-monorepo/
 
 - **Ruta**: `services/booking-service`
 - **Stack**: Go (Golang), Gin Framework, GORM
+- **Puerto**: 4000
 - **Función**:
   - Gestión de inventario (eventos, asientos, órdenes).
   - Bloqueo temporal de asientos para evitar sobreventa.
   - Creación de sesiones de checkout con Stripe.
+  - Integración con sistema de notificaciones por email y creacion de PDF con detalles de compras.
 
 <a id="payment-lambda"></a>
 ### ⚡ Payment Lambda
 
 - **Ruta**: `lambdas/payment-processor`
-- **Stack**: Node.js
-- **Función**: Worker asíncrono que procesa webhooks/mensajes, marca asientos como `SOLD`, crea la orden y actualiza disponibilidad.
+- **Stack**: Node.js, AWS SDK, Stripe SDK
+- **Función**: Worker asíncrono que procesa webhooks/mensajes, marca asientos como `SOLD`, actualiza la orden de compra de "PENDING" a "COMPLETED", manda email de confirmación al usuario, crea PDF con detalles de la compra y actualiza disponibilidad.
 
 <a id="guía-de-pruebas-de-integración-con-stripe"></a>
 ## 🧪 Guía de pruebas de integración con Stripe
@@ -363,6 +390,13 @@ booking_service_envs = {
   STRIPE_SUCCESS_URL = "http://localhost:4000/api/v1/events"
   STRIPE_CANCEL_URL = "http://localhost:4000/api/v1/events"
   STRIPE_WEBHOOK_SECRET = "http://localhost:4000/api/v1/stripe/webhook"
+
+  SMTP_HOST = "your_smtp_host"
+  SMTP_PORT = "your_smtp_port"
+  SMTP_USER = "your_smtp_user"
+  SMTP_PASS = "your_smtp_password"
+  EMAIL_FROM = "your_smtp_password"
+  WORKERS = "your_smtp_password"
 }
 ```
 
@@ -391,7 +425,6 @@ cd infra/terraform/lambda-webhook && terraform init
 
 npm run deploy:lambda
 ```
-
 
 #### Hacer deploy de tanto de los dos microservicios a ECS (Fargate) y de la funcion Lambda:
 ```
