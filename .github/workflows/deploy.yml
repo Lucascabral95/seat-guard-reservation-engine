@@ -33,7 +33,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.25.3'
           cache-dependency-path: services/booking-service/go.sum
       
       - name: Verify Go Build

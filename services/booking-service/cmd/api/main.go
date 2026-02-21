@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"strconv"
 
@@ -26,12 +27,22 @@ type SendMessageReq struct {
 
 func main() {
 	runSeed := flag.Bool("seed", false, "Run database seeding")
+	runMigrate := flag.Bool("migrate", false, "Run database migrations")
 	flag.Parse()
 
 	cfg := config.LoadConfig()
-	db := database.InitDB(cfg)
+	db := database.InitDB(context.Background(), cfg)
 
-	// Si pongo "-seed", ejecuto la semilla
+	// Si pongo "-migrate", ejecuto las migraciones y salgo
+	if *runMigrate {
+		log.Println("Ejecutando Migraciones de Base de Datos...")
+		if err := database.RunMigrations(db); err != nil {
+			log.Fatal("Error en la migración:", err)
+		}
+		return
+	}
+
+	// // Si pongo "-seed", ejecuto la semilla
 	if *runSeed {
 		log.Println("Ejecutando Semilla (Reset & Seed)...")
 		if err := seeds.ResetAndSeed(db); err != nil {
@@ -40,6 +51,14 @@ func main() {
 		log.Println("Database seeded successfully!")
 		return
 	}
+
+	defer func() {
+		if err := database.CloseDB(db); err != nil {
+			fmt.Print("Base de datos cerrada")
+		} else {
+			fmt.Print("Error al cerrar la base de datos")
+		}
+	}()
 
 	// Events
 	eventRepo := repositories.NewEventRepository(db)

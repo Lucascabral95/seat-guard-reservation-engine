@@ -1,6 +1,7 @@
 {
   "scripts": {
     "auth:run": "cd services/auth-service && nest start --watch",
+    "go:migrate": "cd services/booking-service && go run cmd/api/main.go -migrate",
     "go:seed": "cd services/booking-service && go run cmd/api/main.go -seed",
     "go:run": "cd services/booking-service && go run cmd/api/main.go",
     "nest:run": "cd services/auth-service && nest start --watch",
