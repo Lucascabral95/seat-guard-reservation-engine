@@ -5,6 +5,10 @@
     "go:seed": "cd services/booking-service && go run cmd/api/main.go -seed",
     "go:run": "cd services/booking-service && go run cmd/api/main.go",
     "nest:run": "cd services/auth-service && nest start --watch",
+    "go:test": "cd services/booking-service && go test ./...",
+    "go:test:detail": "cd services/booking-service && go test -v ./...",
+    "go:test:coverage": "cd services/booking-service && go test -cover ./...",
+    "nest:test": "cd services/auth-service && npm run test",
 
     "deploy:fargate": "cd infra/terraform && terraform apply -auto-approve",
     "destroy:fargate": "cd infra/terraform && terraform destroy -auto-approve",
