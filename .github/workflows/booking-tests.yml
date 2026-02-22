@@ -1,0 +1,99 @@
+name: Booking Service Tests
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "services/booking-service/**"
+      - ".github/workflows/booking-tests.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "services/booking-service/**"
+      - ".github/workflows/booking-tests.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: booking-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  booking-unit:
+    name: Booking Unit + Coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/booking-service
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.3"
+          cache-dependency-path: services/booking-service/go.sum
+
+      - name: Run Tests and Generate Coverage
+        run: |
+          set -euo pipefail
+          go test ./... -coverprofile=coverage.out -covermode=atomic
+          go tool cover -func coverage.out | tee coverage-summary.txt
+
+      - name: Upload Coverage Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: booking-coverage
+          path: |
+            services/booking-service/coverage.out
+            services/booking-service/coverage-summary.txt
+
+  booking-integration-db:
+    name: Booking Integration (Postgres)
+    runs-on: ubuntu-latest
+    needs: booking-unit
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: booking_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d booking_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      BOOKING_IT_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/booking_test?sslmode=disable
+      BOOKING_IT_ALLOW_SEED_RESET: "true"
+    defaults:
+      run:
+        working-directory: services/booking-service
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.3"
+          cache-dependency-path: services/booking-service/go.sum
+
+      - name: Install PostgreSQL Client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Enable pgcrypto Extension
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h 127.0.0.1 -p 5433 -U postgres -d booking_test -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+
+      - name: Run Integration Tests (Serial)
+        run: |
+          set -euo pipefail
+          go test -p 1 ./internal/database ./internal/database/seeds ./internal/repositories -v -count=1
