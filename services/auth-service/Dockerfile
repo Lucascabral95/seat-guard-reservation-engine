@@ -46,11 +46,12 @@ ENV NODE_ENV=production
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Instalo deps de producción Y prisma CLI para poder regenerar
-RUN npm ci --omit=dev && npm install -D prisma
+# Instalo deps completas, genero Prisma y luego pruno devDependencies
+RUN npm ci
 
 # Regenero el cliente ESPECÍFICAMENTE para el entorno Alpine de producción
 RUN npx prisma generate
+RUN npm prune --omit=dev
 
 # Copio el build limpio desde el builder
 COPY --from=builder /usr/src/app/dist ./dist
