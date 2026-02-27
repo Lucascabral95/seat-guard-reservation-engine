@@ -54,85 +54,85 @@ func applyEventFilter(db *gorm.DB, f models.EventFilter) *gorm.DB {
 }
 
 func TestEventFilter_ByName(t *testing.T) {
-    db := setupTestDB(t)
-    seedEvents(t, db)
+	db := setupTestDB(t)
+	seedEvents(t, db)
 
-    filter := models.EventFilter{Name: "Jazz"}
+	filter := models.EventFilter{Name: "Jazz"}
 
-    var results []models.Event
-    err := applyEventFilter(db, filter).Find(&results).Error
+	var results []models.Event
+	err := applyEventFilter(db, filter).Find(&results).Error
 
-    assert.NoError(t, err)
-    assert.Len(t, results, 1)
-    assert.Equal(t, "Buenos Aires Jazz", results[0].Name)
+	assert.NoError(t, err)
+	assert.Len(t, results, 1)
+	assert.Equal(t, "Buenos Aires Jazz", results[0].Name)
 }
 
 func TestEventFilter_ByGender(t *testing.T) {
-    db := setupTestDB(t)
-    seedEvents(t, db)
+	db := setupTestDB(t)
+	seedEvents(t, db)
 
-    filter := models.EventFilter{Gender: string(models.Rock)}
+	filter := models.EventFilter{Gender: string(models.Rock)}
 
-    var results []models.Event
-    err := applyEventFilter(db, filter).Find(&results).Error
+	var results []models.Event
+	err := applyEventFilter(db, filter).Find(&results).Error
 
-    assert.NoError(t, err)
-    assert.Len(t, results, 1)
-    assert.Equal(t, "Lollapalooza", results[0].Name)
+	assert.NoError(t, err)
+	assert.Len(t, results, 1)
+	assert.Equal(t, "Lollapalooza", results[0].Name)
 }
 
 func TestEventFilter_ByLocation(t *testing.T) {
-    db := setupTestDB(t)
-    seedEvents(t, db)
+	db := setupTestDB(t)
+	seedEvents(t, db)
 
-    filter := models.EventFilter{Location: "Buenos Aires"}
+	filter := models.EventFilter{Location: "Buenos Aires"}
 
-    var results []models.Event
-    err := applyEventFilter(db, filter).Find(&results).Error
+	var results []models.Event
+	err := applyEventFilter(db, filter).Find(&results).Error
 
-    assert.NoError(t, err)
-    assert.Len(t, results, 2)
+	assert.NoError(t, err)
+	assert.Len(t, results, 2)
 }
 
 func TestEventFilter_MultipleFields(t *testing.T) {
-    db := setupTestDB(t)
-    seedEvents(t, db)
+	db := setupTestDB(t)
+	seedEvents(t, db)
 
-    filter := models.EventFilter{
-        Location: "Buenos Aires",
-        Gender:   string(models.Rock),
-    }
+	filter := models.EventFilter{
+		Location: "Buenos Aires",
+		Gender:   string(models.Rock),
+	}
 
-    var results []models.Event
-    err := applyEventFilter(db, filter).Find(&results).Error
+	var results []models.Event
+	err := applyEventFilter(db, filter).Find(&results).Error
 
-    assert.NoError(t, err)
-    assert.Len(t, results, 1)
-    assert.Equal(t, "Lollapalooza", results[0].Name)
+	assert.NoError(t, err)
+	assert.Len(t, results, 1)
+	assert.Equal(t, "Lollapalooza", results[0].Name)
 }
 
 func TestEventFilter_NoMatch(t *testing.T) {
-    db := setupTestDB(t)
-    seedEvents(t, db)
+	db := setupTestDB(t)
+	seedEvents(t, db)
 
-    filter := models.EventFilter{Name: "Tomorrowland"}
+	filter := models.EventFilter{Name: "Tomorrowland"}
 
-    var results []models.Event
-    err := applyEventFilter(db, filter).Find(&results).Error
+	var results []models.Event
+	err := applyEventFilter(db, filter).Find(&results).Error
 
-    assert.NoError(t, err)
-    assert.Empty(t, results)
+	assert.NoError(t, err)
+	assert.Empty(t, results)
 }
 
 func TestEventFilter_Empty_ReturnsAll(t *testing.T) {
-    db := setupTestDB(t)
-    seedEvents(t, db)
+	db := setupTestDB(t)
+	seedEvents(t, db)
 
-    filter := models.EventFilter{}
+	filter := models.EventFilter{}
 
-    var results []models.Event
-    err := applyEventFilter(db, filter).Find(&results).Error
+	var results []models.Event
+	err := applyEventFilter(db, filter).Find(&results).Error
 
-    assert.NoError(t, err)
-    assert.Len(t, results, 3)
+	assert.NoError(t, err)
+	assert.Len(t, results, 3)
 }
