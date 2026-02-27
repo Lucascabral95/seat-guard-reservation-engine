@@ -50,6 +50,19 @@ func (h *EmailHandler) SendSync(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "sent"})
 }
 
+// SendAsync godoc
+// @Summary Envío asíncrono
+// @Description Envío asíncrono de email
+// @Tags emails
+// @Accept json
+// @Produce json
+// @Param email body SendRequest true "Datos del email"
+// @Success 202 {object} map[string]string "Email encolado satisfactoriamente"
+// @Failure 400 {object} map[string]string "Formato JSON inválido"
+// @Failure 401 {object} map[string]string "No autorizado"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /send [post]
+// @Security BearerAuth
 // POST /send - Envío asíncrono
 func (h *EmailHandler) SendAsync(c *gin.Context) {
 	var req SendRequest
@@ -72,6 +85,19 @@ func (h *EmailHandler) SendAsync(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{"status": "queued"})
 }
 
+// SendBulk godoc
+// @Summary Envío masivo
+// @Description Envío masivo de emails
+// @Tags emails
+// @Accept json
+// @Produce json
+// @Param emails body BulkRequest true "Datos de los emails"
+// @Success 202 {object} map[string]string "Emails encolados satisfactoriamente"
+// @Failure 400 {object} map[string]string "Formato JSON inválido"
+// @Failure 401 {object} map[string]string "No autorizado"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /send-bulk [post]
+// @Security BearerAuth
 // POST /send-bulk - Envío masivo
 func (h *EmailHandler) SendBulk(c *gin.Context) {
 	var req BulkRequest

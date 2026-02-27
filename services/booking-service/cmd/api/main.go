@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"time"
 
+	_ "booking-service/docs"
 	"booking-service/internal/config"
 	"booking-service/internal/database"
 	"booking-service/internal/database/seeds"
@@ -19,7 +21,33 @@ import (
 	"booking-service/internal/services"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	"golang.org/x/time/rate"
 )
+
+// @title SeatGuard Booking Service API
+// @version 1.0
+// @description API para reservas, asientos, checkout y tickets.
+// @contact.name Lucas Cabral
+// @contact.email lucassimple@hotmail.com
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+// @host localhost:4000
+// @BasePath /api/v1
+// @schemes http https
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Formato: Bearer <token>
+// @tag.name Events
+// @description Operaciones para gestionar eventos
+// @tag.name Seats
+// @description Operaciones para gestionar asientos
+// @tag.name Booking Order
+// @description Operaciones para gestionar órdenes de reserva 
+// @tag.name Checkout
+// @description Operaciones para gestionar el proceso de checkout
 
 type SendMessageReq struct {
 	Message string `json:"message" binding:"required"`
@@ -87,8 +115,6 @@ func main() {
 	ticketHandler := handlers.NewTicketHandler(ticketService, pdfService, bookingOrderService, checkoutService)
 
 	// Emails
-	// Emails
-	// Emails
 	host := cfg.Smtp_Host
 	port := cfg.Smtp_Port
 	user := cfg.Smtp_User
@@ -106,9 +132,6 @@ func main() {
 	}
 	emailService := services.NewEmailService(emailRepo, workersInt)
 	emailHandler := handlers.NewEmailHandler(emailService)
-	// Emails
-	// Emails
-	// Emails
 
 	// Queue AWS SQS
 	ctx := context.Background()
@@ -123,8 +146,13 @@ func main() {
 
 	guardUserJWT := middleware.UserMiddleware()
 
+	globalUrl := middleware.NewRateLimiter(rate.Every(time.Second/10), 20)
+
 	r := gin.Default()
 	r.Use(utils.GetCorsConfig())
+	r.Use(globalUrl.Middleware())
+
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	r.GET("health", func(c *gin.Context) {
 		c.JSON(200, gin.H{

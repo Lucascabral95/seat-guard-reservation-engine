@@ -4,6 +4,7 @@
     "go:migrate": "cd services/booking-service && go run cmd/api/main.go -migrate",
     "go:seed": "cd services/booking-service && go run cmd/api/main.go -seed",
     "go:run": "cd services/booking-service && go run cmd/api/main.go",
+    "go:swagger": "cd services/booking-service && go run github.com/swaggo/swag/cmd/swag init -g cmd/api/main.go",
     "nest:run": "cd services/auth-service && nest start --watch",
     "go:test": "cd services/booking-service && go test ./...",
     "go:test:detail": "cd services/booking-service && go test -v ./...",

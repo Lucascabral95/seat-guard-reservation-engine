@@ -1,0 +1,1660 @@
+basePath: /api/v1
+definitions:
+  handlers.BulkRequest:
+    properties:
+      emails:
+        items:
+          $ref: '#/definitions/handlers.SendRequest'
+        minItems: 1
+        type: array
+    required:
+    - emails
+    type: object
+  handlers.CreateCartCheckoutReq:
+    properties:
+      currency:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/handlers.TicketItem'
+        type: array
+      userId:
+        type: string
+    type: object
+  handlers.SeatStruc:
+    properties:
+      id:
+        type: string
+    type: object
+  handlers.SendRequest:
+    properties:
+      body:
+        type: string
+      subject:
+        type: string
+      to:
+        items:
+          type: string
+        type: array
+    required:
+    - body
+    - subject
+    - to
+    type: object
+  handlers.StripeData:
+    properties:
+      object:
+        $ref: '#/definitions/handlers.StripeObject'
+    type: object
+  handlers.StripeMetadata:
+    properties:
+      event_id:
+        type: string
+      order_id:
+        description: <--- ESTO ES LO IMPORTANTE
+        type: string
+      seat_ids:
+        type: string
+      user_id:
+        type: string
+    type: object
+  handlers.StripeObject:
+    properties:
+      amount:
+        type: number
+      amount_total:
+        type: number
+      id:
+        description: El PaymentIntent ID o Session ID
+        type: string
+      metadata:
+        $ref: '#/definitions/handlers.StripeMetadata'
+      payment_intent:
+        type: string
+      payment_status:
+        description: '"paid", "unpaid"'
+        type: string
+      status:
+        description: payment_intent.* usa "succeeded", "requires_payment_method",
+          etc.
+        type: string
+    type: object
+  handlers.StripeWebhookReq:
+    properties:
+      data:
+        $ref: '#/definitions/handlers.StripeData'
+      id:
+        type: string
+      object:
+        type: string
+      type:
+        type: string
+    type: object
+  handlers.TicketItem:
+    properties:
+      amount:
+        type: integer
+      name:
+        type: string
+      seatIds:
+        $ref: '#/definitions/handlers.SeatStruc'
+    type: object
+  handlers.updateBookingOrderReq:
+    properties:
+      paymentProviderId:
+        type: string
+      status:
+        $ref: '#/definitions/models.PaymentStatus'
+    required:
+    - status
+    type: object
+  models.Availability:
+    enum:
+    - HIGH
+    - MEDIUM
+    - LOW
+    - SOLD_OUT
+    type: string
+    x-enum-varnames:
+    - AvailabilityHigh
+    - AvailabilityMedium
+    - AvailabilityLow
+    - AvailabilitySoldOut
+  models.BookingOrder:
+    properties:
+      amount:
+        type: integer
+      createdAt:
+        type: string
+      eventHour:
+        type: string
+      eventName:
+        type: string
+      id:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/models.Seat'
+        type: array
+      paymentProviderId:
+        description: Token o ID de transacción de la pasarela de pago (Stripe/MercadoPago)
+        type: string
+      seatIds:
+        description: |-
+          Asientos involucrados en esta orden
+          SeatIDs []string `gorm:"type:text[]" json:"seatIds"`
+        items:
+          type: string
+        type: array
+      status:
+        $ref: '#/definitions/models.PaymentStatus'
+      updatedAt:
+        type: string
+      userId:
+        type: string
+    type: object
+  models.Checkout:
+    properties:
+      amount:
+        type: integer
+      createdAt:
+        type: string
+      currency:
+        type: string
+      customerEmail:
+        type: string
+      customerId:
+        type: string
+      customerName:
+        type: string
+      id:
+        type: string
+      order:
+        $ref: '#/definitions/models.BookingOrder'
+      orderId:
+        type: string
+      paymentIntentId:
+        type: string
+      paymentProvider:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.Event:
+    properties:
+      availability:
+        allOf:
+        - $ref: '#/definitions/models.Availability'
+        description: |-
+          Disponibilidad del evento
+          enums: HIGH, MEDIUM, LOW, SOLD_OUT
+      createdAt:
+        type: string
+      date:
+        type: string
+      description:
+        description: Opcional en JSON
+        type: string
+      gender:
+        type: string
+      id:
+        type: string
+      location:
+        type: string
+      name:
+        type: string
+      posterUrl:
+        type: string
+      price:
+        description: Precio base por entrada
+        type: integer
+      seats:
+        items:
+          $ref: '#/definitions/models.Seat'
+        type: array
+      updatedAt:
+        type: string
+    type: object
+  models.PaymentStatus:
+    enum:
+    - PENDING
+    - COMPLETED
+    - FAILED
+    type: string
+    x-enum-varnames:
+    - PaymentPending
+    - PaymentCompleted
+    - PaymentFailed
+  models.Seat:
+    properties:
+      createdAt:
+        type: string
+      eventHour:
+        type: string
+      eventId:
+        description: Relaciones
+        type: string
+      eventName:
+        type: string
+      id:
+        type: string
+      lockedAt:
+        description: Cuando se desbloquea
+        type: string
+      lockedBy:
+        description: Control de Bloqueo Temporal
+        type: string
+      number:
+        description: '"10", "A1", etc.'
+        type: string
+      price:
+        type: number
+      section:
+        description: 'Identificación del asiento (ej: A-10, B-5)'
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/models.SeatStatus'
+        description: |-
+          Estado actual del asiento
+          enums: AVAILABLE, RESERVED, SOLD, BLOCKED
+      ticketId:
+        description: ID del ticket final si se vende
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.SeatStatus:
+    description: Estado del asiento
+    enum:
+    - AVAILABLE
+    - LOCKED
+    - SOLD
+    type: string
+    x-enum-varnames:
+    - StatusAvailable
+    - StatusLocked
+    - StatusSold
+  models.TicketPDF:
+    properties:
+      amount:
+        type: integer
+      createdAt:
+        type: string
+      currency:
+        type: string
+      customerId:
+        type: string
+      email:
+        type: string
+      eventHour:
+        type: string
+      eventName:
+        type: string
+      id:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/models.Seat'
+        type: array
+      name:
+        type: string
+      orderId:
+        type: string
+      paymentIntentId:
+        type: string
+      paymentProvider:
+        type: string
+      pdfGeneratedAt:
+        type: string
+      pdfVersion:
+        type: integer
+      updatedAt:
+        type: string
+    type: object
+host: localhost:4000
+info:
+  contact:
+    email: lucassimple@hotmail.com
+    name: Lucas Cabral
+  description: API para reservas, asientos, checkout y tickets.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: SeatGuard Booking Service API
+  version: "1.0"
+paths:
+  /booking-order:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene todos los registros de booking orders
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Booking orders encontrados
+          schema:
+            items:
+              $ref: '#/definitions/models.BookingOrder'
+            type: array
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener todos los booking orders
+      tags:
+      - booking-order
+    post:
+      consumes:
+      - application/json
+      description: Crea un nuevo registro de booking order
+      parameters:
+      - description: Datos del booking order
+        in: body
+        name: bookingOrder
+        required: true
+        schema:
+          $ref: '#/definitions/models.BookingOrder'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Booking order creado exitosamente
+          schema:
+            $ref: '#/definitions/models.BookingOrder'
+        "400":
+          description: Datos inválidos
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Crear booking order
+      tags:
+      - booking-order
+  /booking-order/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene un registro de booking order por su ID
+      parameters:
+      - description: ID del booking order
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Booking order encontrado
+          schema:
+            $ref: '#/definitions/models.BookingOrder'
+        "400":
+          description: ID inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Booking order no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener booking order por ID
+      tags:
+      - booking-order
+    put:
+      consumes:
+      - application/json
+      description: Actualiza un registro de booking order
+      parameters:
+      - description: ID del booking order
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Datos del booking order
+        in: body
+        name: bookingOrder
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateBookingOrderReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Booking order actualizado exitosamente
+          schema:
+            $ref: '#/definitions/models.BookingOrder'
+        "400":
+          description: Datos inválidos
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Actualizar booking order
+      tags:
+      - booking-order
+  /booking-order/user/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene todos los registros de booking orders por ID de usuario
+      parameters:
+      - description: ID del usuario
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Booking orders encontrados
+          schema:
+            items:
+              $ref: '#/definitions/models.BookingOrder'
+            type: array
+        "400":
+          description: ID inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Booking order no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener todos los booking orders por ID de usuario
+      tags:
+      - booking-order
+  /checkout:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene todos los registros de checkout
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Checkouts encontrados
+          schema:
+            items:
+              $ref: '#/definitions/models.Checkout'
+            type: array
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener todos los checkouts
+      tags:
+      - checkout
+    post:
+      consumes:
+      - application/json
+      description: Crea un nuevo registro de checkout
+      parameters:
+      - description: Datos del checkout
+        in: body
+        name: checkout
+        required: true
+        schema:
+          $ref: '#/definitions/models.Checkout'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Checkout creado exitosamente
+          schema:
+            $ref: '#/definitions/models.Checkout'
+        "400":
+          description: Datos inválidos
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Crear checkout
+      tags:
+      - checkout
+    put:
+      consumes:
+      - application/json
+      description: Actualiza un registro de checkout
+      parameters:
+      - description: Datos del checkout
+        in: body
+        name: checkout
+        required: true
+        schema:
+          $ref: '#/definitions/models.Checkout'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Checkout actualizado exitosamente
+          schema:
+            $ref: '#/definitions/models.Checkout'
+        "400":
+          description: Datos inválidos
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Actualizar checkout
+      tags:
+      - checkout
+  /checkout/{orderID}:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene un registro de checkout por order ID
+      parameters:
+      - description: Order ID
+        in: path
+        name: orderID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Checkout encontrado
+          schema:
+            $ref: '#/definitions/models.Checkout'
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener checkout por order ID
+      tags:
+      - checkout
+  /events:
+    get:
+      consumes:
+      - application/json
+      description: Obtener todos los eventos
+      parameters:
+      - description: Nombre del evento
+        in: query
+        name: name
+        type: string
+      - description: Género del evento
+        in: query
+        name: gender
+        type: string
+      - description: Ubicación del evento
+        in: query
+        name: location
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Lista de eventos
+          schema:
+            items:
+              $ref: '#/definitions/models.Event'
+            type: array
+        "400":
+          description: Formato de parámetros inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener todos los eventos
+      tags:
+      - events
+    post:
+      consumes:
+      - application/json
+      description: Crear un evento nuevo
+      parameters:
+      - description: Datos del evento
+        in: body
+        name: event
+        required: true
+        schema:
+          $ref: '#/definitions/models.Event'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Evento creado exitosamente
+          schema:
+            $ref: '#/definitions/models.Event'
+        "400":
+          description: Formato JSON inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Crear evento
+      tags:
+      - events
+  /events/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Eliminar un evento existente
+      parameters:
+      - description: ID del evento
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Evento eliminado exitosamente
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Eliminar evento
+      tags:
+      - events
+    get:
+      consumes:
+      - application/json
+      description: Obtener un evento por su ID
+      parameters:
+      - description: ID del evento
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Event'
+        "400":
+          description: Formato UUID inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Evento no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener evento por ID
+      tags:
+      - events
+    put:
+      consumes:
+      - application/json
+      description: Actualizar un evento existente
+      parameters:
+      - description: ID del evento
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Datos del evento
+        in: body
+        name: event
+        required: true
+        schema:
+          $ref: '#/definitions/models.Event'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Evento actualizado exitosamente
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Formato JSON inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Evento no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Actualizar evento
+      tags:
+      - events
+  /events/availability/{id}:
+    patch:
+      consumes:
+      - application/json
+      description: Actualizar la disponibilidad para un evento existente
+      parameters:
+      - description: ID del evento
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Disponibilidad actualizada exitosamente
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Actualizar disponibilidad para un evento
+      tags:
+      - events
+  /seats:
+    get:
+      description: Obtener todos los asientos
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Asientos obtenidos satisfactoriamente
+          schema:
+            items:
+              $ref: '#/definitions/models.Seat'
+            type: array
+        "500":
+          description: Error al obtener los asientos
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener asientos
+      tags:
+      - Seats
+    post:
+      consumes:
+      - application/json
+      description: Crear un nuevo asiento
+      parameters:
+      - description: Datos del asiento
+        in: body
+        name: seat
+        required: true
+        schema:
+          $ref: '#/definitions/models.Seat'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Asiento creado satisfactoriamente
+          schema:
+            $ref: '#/definitions/models.Seat'
+        "400":
+          description: Formato JSON inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error al crear el asiento
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Crear asiento
+      tags:
+      - Seats
+  /seats/{id}:
+    get:
+      description: Obtener un asiento por su ID
+      parameters:
+      - description: ID del asiento
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Asiento obtenido satisfactoriamente
+          schema:
+            $ref: '#/definitions/models.Seat'
+        "400":
+          description: Formato UUID inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Sin resultados
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error al obtener el asiento
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener asiento
+      tags:
+      - Seats
+    patch:
+      consumes:
+      - application/json
+      description: Actualizar el estado de un asiento
+      parameters:
+      - description: ID del asiento
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Nuevo estado del asiento
+        in: body
+        name: status
+        required: true
+        schema:
+          type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Asiento actualizado satisfactoriamente
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Formato UUID inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Asiento no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error al actualizar el asiento
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Actualizar estado de asiento
+      tags:
+      - Seats
+  /seats/event/{eventId}:
+    get:
+      description: Obtener todos los asientos por ID de evento
+      parameters:
+      - description: ID del evento
+        in: path
+        name: eventId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Asientos obtenidos satisfactoriamente
+          schema:
+            items:
+              $ref: '#/definitions/models.Seat'
+            type: array
+        "400":
+          description: Formato UUID inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Asientos no encontrados
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error al obtener los asientos
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener asientos por ID de evento
+      tags:
+      - Seats
+  /seats/lock/{id}/uid/{uid}:
+    patch:
+      consumes:
+      - application/json
+      description: Bloquear asiento por 15 minutos
+      parameters:
+      - description: ID del asiento
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: UID del usuario
+        in: path
+        name: uid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Asiento bloqueado satisfactoriamente
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Formato UUID inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Asiento no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error al bloquear el asiento
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Bloquear asiento
+      tags:
+      - Seats
+  /send:
+    post:
+      consumes:
+      - application/json
+      description: Envío asíncrono de email
+      parameters:
+      - description: Datos del email
+        in: body
+        name: email
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SendRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Email encolado satisfactoriamente
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Formato JSON inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Envío asíncrono
+      tags:
+      - emails
+  /send-bulk:
+    post:
+      consumes:
+      - application/json
+      description: Envío masivo de emails
+      parameters:
+      - description: Datos de los emails
+        in: body
+        name: emails
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.BulkRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Emails encolados satisfactoriamente
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Formato JSON inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Envío masivo
+      tags:
+      - emails
+  /sqs/messaging:
+    post:
+      consumes:
+      - application/json
+      description: Envía un mensaje a SQS con los datos del webhook de Stripe
+      parameters:
+      - description: Datos del webhook de Stripe
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.StripeWebhookReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Mensaje enviado exitosamente
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Solicitud inválida
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Enviar mensaje a SQS
+      tags:
+      - SQS
+  /stripe/cart/checkout:
+    post:
+      consumes:
+      - application/json
+      description: Crea una sesión de pago en Stripe para un carrito de tickets
+      parameters:
+      - description: Datos del carrito
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateCartCheckoutReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Sesión de pago creada exitosamente
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Solicitud inválida
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Asiento no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Asiento no disponible
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Crear sesión de pago Stripe para carrito
+      tags:
+      - Stripe
+  /tickets:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene todos los tickets (solo admin)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Lista de tickets
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Error interno
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener todos los tickets
+      tags:
+      - tickets
+    post:
+      consumes:
+      - application/json
+      description: Crea un ticket a partir de un order completado
+      parameters:
+      - description: Datos del ticket
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Ticket creado
+          schema:
+            $ref: '#/definitions/models.TicketPDF'
+        "400":
+          description: Datos inválidos
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Order no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Ticket ya existe
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Crear ticket desde endpoint
+      tags:
+      - tickets
+  /tickets/{orderID}:
+    delete:
+      consumes:
+      - application/json
+      description: Elimina un ticket (soft delete) - solo owner o admin
+      parameters:
+      - description: ID del order
+        in: path
+        name: orderID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ticket eliminado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Acceso denegado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Ticket no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Eliminar ticket
+      tags:
+      - tickets
+    get:
+      consumes:
+      - application/json
+      description: Obtiene los datos del ticket sin el PDF binario
+      parameters:
+      - description: ID del order
+        in: path
+        name: orderID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Metadata del ticket
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: ID inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autenticado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Acceso denegado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Ticket no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener metadata del ticket
+      tags:
+      - tickets
+  /tickets/{orderID}/download:
+    get:
+      consumes:
+      - application/json
+      description: Genera y descarga el PDF del ticket
+      parameters:
+      - description: ID del order
+        in: path
+        name: orderID
+        required: true
+        type: string
+      produces:
+      - application/pdf
+      responses:
+        "200":
+          description: PDF del ticket
+          schema:
+            type: file
+        "400":
+          description: ID inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autenticado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Acceso denegado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Ticket no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Descargar PDF del ticket
+      tags:
+      - tickets
+  /tickets/{orderID}/regenerate:
+    post:
+      consumes:
+      - application/json
+      description: Regenera el PDF del ticket
+      parameters:
+      - description: ID del order
+        in: path
+        name: orderID
+        required: true
+        type: string
+      produces:
+      - application/pdf
+      responses:
+        "200":
+          description: PDF del ticket
+          schema:
+            type: file
+        "400":
+          description: ID inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autenticado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Acceso denegado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Ticket no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Regenerar PDF del ticket
+      tags:
+      - tickets
+  /tickets/by-id/{ticketID}:
+    get:
+      consumes:
+      - application/json
+      description: Obtiene un ticket específico por su ID (solo owner o admin)
+      parameters:
+      - description: ID del ticket
+        in: path
+        name: ticketID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ticket encontrado
+          schema:
+            $ref: '#/definitions/models.TicketPDF'
+        "403":
+          description: Acceso denegado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Ticket no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Obtener ticket por ID
+      tags:
+      - tickets
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    description: |-
+      Formato: Bearer <token>
+      Operaciones para gestionar eventos
+      Operaciones para gestionar asientos
+      Operaciones para gestionar órdenes de reserva
+      Operaciones para gestionar el proceso de checkout
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

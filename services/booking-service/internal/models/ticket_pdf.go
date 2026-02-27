@@ -2,6 +2,7 @@ package models
 
 import "time"
 
+// TicketPDF representa un PDF de ticket generado para un pedido de reserva
 type TicketPDF struct {
 	BaseModel
 
@@ -21,7 +22,6 @@ type TicketPDF struct {
 
 	Items []Seat `gorm:"-" json:"items,omitempty"`
 
-	// ✅ NUEVO: PDF binario y metadata
 	PDFData        []byte     `gorm:"type:bytea" json:"-"`
 	PDFGeneratedAt *time.Time `gorm:"type:timestamp" json:"pdfGeneratedAt,omitempty"`
 	PDFVersion     int        `gorm:"default:1" json:"pdfVersion"`

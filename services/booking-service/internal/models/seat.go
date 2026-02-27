@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// @Description Estado del asiento
 type SeatStatus string
 
 const (
@@ -43,6 +44,7 @@ const (
 	Metal       Gender = "METAL"
 )
 
+// BaseModel es la estructura base para todas las entidades
 type BaseModel struct {
 	ID        string         `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 	CreatedAt time.Time      `json:"createdAt"`
@@ -50,6 +52,7 @@ type BaseModel struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
+// Event representa un evento musical o de entretenimiento
 type Event struct {
 	BaseModel
 
@@ -60,13 +63,14 @@ type Event struct {
 	Price        int64        `gorm:"not null" json:"price"` // Precio base por entrada
 	PosterURL    string       `json:"posterUrl"`
 	Gender       string       `gorm:"type:varchar(20);default:'VARIOS'" json:"gender"`
+	// Disponibilidad del evento
+	// enums: HIGH, MEDIUM, LOW, SOLD_OUT
 	Availability Availability `gorm:"type:varchar(20);default:'HIGH'" json:"availability"`
 
-	// Relación: Un evento tiene muchos asientos
 	Seats []Seat `gorm:"foreignKey:EventID" json:"seats,omitempty"`
 }
 
-// --- ASIENTO ---
+// Seat representa un asiento específico en un evento
 type Seat struct {
 	BaseModel
 
@@ -74,8 +78,10 @@ type Seat struct {
 	Section string `json:"section"`                // "VIP", "Platea", "General"
 	Number  string `gorm:"not null" json:"number"` // "10", "A1", etc.
 
-	Price float64 `json:"price"` // Precio específico (puede anular el del evento)
+	Price float64 `json:"price"` 
 
+	// Estado actual del asiento
+	// enums: AVAILABLE, RESERVED, SOLD, BLOCKED
 	Status SeatStatus `gorm:"type:varchar(20);default:'AVAILABLE'" json:"status"`
 
 	// Control de Bloqueo Temporal
@@ -90,7 +96,7 @@ type Seat struct {
 	EventHour string `gorm:"-" json:"eventHour,omitempty"`
 }
 
-// --- PAGO / ORDEN ---
+// BookingOrder representa una orden de pago para uno o más asientos
 type BookingOrder struct {
 	BaseModel
 
@@ -109,6 +115,7 @@ type BookingOrder struct {
 	EventHour         string `gorm:"-" json:"eventHour,omitempty"`
 }
 
+// Checkout representa los datos del usuario pagador
 // Datos del usuario pagador
 type Checkout struct {
 	BaseModel

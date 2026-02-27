@@ -64,6 +64,17 @@ type BookingMessage struct {
 	StripeEventType string `json:"stripeEventType"`
 }
 
+// Send Envía un mensaje a SQS con los datos del webhook de Stripe
+// @Summary Enviar mensaje a SQS
+// @Description Envía un mensaje a SQS con los datos del webhook de Stripe
+// @Tags SQS
+// @Accept json
+// @Produce json
+// @Param body body StripeWebhookReq true "Datos del webhook de Stripe"
+// @Success 200 {object} map[string]string "Mensaje enviado exitosamente"
+// @Failure 400 {object} map[string]string "Solicitud inválida"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /sqs/messaging [post]
 func (h *SQSHandler) Send(c *gin.Context) {
 	var stripeReq StripeWebhookReq
 	if err := c.ShouldBindJSON(&stripeReq); err != nil {
