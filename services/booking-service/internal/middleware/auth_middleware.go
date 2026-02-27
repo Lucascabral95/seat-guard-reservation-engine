@@ -9,56 +9,14 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// func UserMiddleware() gin.HandlerFunc {
-// 	return func(c *gin.Context) {
-// 		internalKey := os.Getenv("SECRET_X_INTERNAL_SECRET")
-// 		if internalKey != "" && c.GetHeader("X-Internal-Secret") == internalKey {
-// 			c.Next()
-// 			return
-// 		}
-// 		// -------------------------------
-
-// 		tokenString, err := utils.ExtractToken(c)
-// 		if err != nil {
-// 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-// 			c.Abort()
-// 			return
-// 		}
-
-// 		claims := jwt.MapClaims{}
-// 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-// 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-// 				return nil, jwt.ErrSignatureInvalid
-// 			}
-// 			return []byte(os.Getenv("JWT_SECRET")), nil
-// 		})
-
-// 		if err != nil || !token.Valid {
-// 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
-// 			c.Abort()
-// 			return
-// 		}
-
-// 		// if userID, ok := claims["sub"].(string); ok {
-// 		// 	c.Set("userID", userID)
-// 		// }
-// 		if userID, ok := claims["id"].(string); ok {
-// 			c.Set("userID", userID)
-// 		}
-
-//			c.Next()
-//		}
-//	}
 func UserMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		// ✅ 0. DEJAR PASAR PREFLIGHT CORS
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
 
-		// 1. Secreto interno
 		internalKey := os.Getenv("SECRET_X_INTERNAL_SECRET")
 		if internalKey != "" && c.GetHeader("X-Internal-Secret") == internalKey {
 			c.Set("userID", "internal")
@@ -67,7 +25,6 @@ func UserMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// 2. Token
 		tokenString, err := utils.ExtractToken(c)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization token required"})

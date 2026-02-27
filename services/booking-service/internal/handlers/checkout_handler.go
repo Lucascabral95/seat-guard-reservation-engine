@@ -16,6 +16,18 @@ func NewCheckoutHandler(service *services.CheckoutService) *CheckoutHandler {
 	return &CheckoutHandler{service: service}
 }
 
+// Create godoc
+// @Summary Crear checkout
+// @Description Crea un nuevo registro de checkout
+// @Tags checkout
+// @Accept json
+// @Produce json
+// @Param checkout body models.Checkout true "Datos del checkout"
+// @Success 201 {object} models.Checkout "Checkout creado exitosamente"
+// @Failure 400 {object} map[string]string "Datos inválidos"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /checkout [post]
+// @Security BearerAuth
 func (h *CheckoutHandler) Create(c *gin.Context) {
 	var checkout models.Checkout
 
@@ -51,6 +63,17 @@ func (h *CheckoutHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, checkout)
 }
 
+// GetByOrderID godoc
+// @Summary Obtener checkout por order ID
+// @Description Obtiene un registro de checkout por order ID
+// @Tags checkout
+// @Accept json
+// @Produce json
+// @Param orderID path string true "Order ID"
+// @Success 200 {object} models.Checkout "Checkout encontrado"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /checkout/{orderID} [get]
+// @Security BearerAuth
 func (h *CheckoutHandler) GetByOrderID(c *gin.Context) {
 	orderID := c.Param("orderID")
 
@@ -63,6 +86,16 @@ func (h *CheckoutHandler) GetByOrderID(c *gin.Context) {
 	c.JSON(http.StatusOK, checkout)
 }
 
+// GetAll godoc
+// @Summary Obtener todos los checkouts
+// @Description Obtiene todos los registros de checkout
+// @Tags checkout
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.Checkout "Checkouts encontrados"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /checkout [get]
+// @Security BearerAuth
 func (h *CheckoutHandler) GetAll(c *gin.Context) {
 	checkouts, err := h.service.FindAll()
 	if err != nil {
@@ -73,6 +106,18 @@ func (h *CheckoutHandler) GetAll(c *gin.Context) {
 	c.JSON(http.StatusOK, checkouts)
 }
 
+// Update godoc
+// @Summary Actualizar checkout
+// @Description Actualiza un registro de checkout
+// @Tags checkout
+// @Accept json
+// @Produce json
+// @Param checkout body models.Checkout true "Datos del checkout"
+// @Success 200 {object} models.Checkout "Checkout actualizado exitosamente"
+// @Failure 400 {object} map[string]string "Datos inválidos"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /checkout [put]
+// @Security BearerAuth
 func (h *CheckoutHandler) Update(c *gin.Context) {
 	var checkout models.Checkout
 

@@ -37,6 +37,21 @@ type ResponseCartCheckoutReq struct {
 	Items          []TicketItem `json:"items"`
 }
 
+// CreateCartCheckoutSession Crea una sesión de pago en Stripe para un carrito de tickets
+// @Summary Crear sesión de pago Stripe para carrito
+// @Description Crea una sesión de pago en Stripe para un carrito de tickets
+// @Tags Stripe
+// @Accept json
+// @Produce json
+// @Param body body CreateCartCheckoutReq true "Datos del carrito"
+// @Success 200 {object} map[string]string "Sesión de pago creada exitosamente"
+// @Failure 400 {object} map[string]string "Solicitud inválida"
+// @Failure 401 {object} map[string]string "No autorizado"
+// @Failure 404 {object} map[string]string "Asiento no encontrado"
+// @Failure 409 {object} map[string]string "Asiento no disponible"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /stripe/cart/checkout [post]
+// @Security BearerAuth
 func CreateCartCheckoutSession(seatService *services.SeatService, orderService *services.BookingOrderService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 

@@ -25,7 +25,7 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/mapped-types": "*",
     "@nestjs/platform-express": "^11.0.1",
-    "@nestjs/swagger": "^11.2.3",
+    "@nestjs/swagger": "^11.2.6",
     "@prisma/adapter-pg": "^7.1.0",
     "@prisma/client": "^7.1.0",
     "bcrypt": "^6.0.0",
@@ -84,6 +84,8 @@
     "moduleNameMapper": {
       "^src/(.*)$": "<rootDir>/$1"
     },
-    "setupFiles": ["<rootDir>/../jest.setup.ts"]
+    "setupFiles": [
+      "<rootDir>/../jest.setup.ts"
+    ]
   }
 }

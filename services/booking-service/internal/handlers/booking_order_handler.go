@@ -17,6 +17,18 @@ func NewBookingOrderHandler(service *services.BookingOrderService) *BookingOrder
 	return &BookingOrderHandler{service: service}
 }
 
+// CreateBookingOrder godoc
+// @Summary Crear booking order
+// @Description Crea un nuevo registro de booking order
+// @Tags booking-order
+// @Accept json
+// @Produce json
+// @Param bookingOrder body models.BookingOrder true "Datos del booking order"
+// @Success 200 {object} models.BookingOrder "Booking order creado exitosamente"
+// @Failure 400 {object} map[string]string "Datos inválidos"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /booking-order [post]
+// @Security BearerAuth
 func (h *BookingOrderHandler) CreateBookingOrder(c *gin.Context) {
 	var bookingOrders models.BookingOrder
 
@@ -33,6 +45,16 @@ func (h *BookingOrderHandler) CreateBookingOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, bookingOrders)
 }
 
+// GetBookingOrders godoc
+// @Summary Obtener todos los booking orders
+// @Description Obtiene todos los registros de booking orders
+// @Tags booking-order
+// @Accept json
+// @Produce json
+// @Success 200 {array} models.BookingOrder "Booking orders encontrados"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /booking-order [get]
+// @Security BearerAuth
 func (h *BookingOrderHandler) GetBookingOrders(c *gin.Context) {
 	bookingOrder, err := h.service.FindAllBookingOrders()
 	if err != nil {
@@ -48,6 +70,19 @@ type updateBookingOrderReq struct {
 	PaymentProviderID string               `json:"paymentProviderId"`
 }
 
+// UpdateBookingOrder godoc
+// @Summary Actualizar booking order
+// @Description Actualiza un registro de booking order
+// @Tags booking-order
+// @Accept json
+// @Produce json
+// @Param id path string true "ID del booking order"
+// @Param bookingOrder body updateBookingOrderReq true "Datos del booking order"
+// @Success 200 {object} models.BookingOrder "Booking order actualizado exitosamente"
+// @Failure 400 {object} map[string]string "Datos inválidos"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /booking-order/{id} [put]
+// @Security BearerAuth
 func (h *BookingOrderHandler) UpdateBookingOrder(c *gin.Context) {
 	id := c.Param("id")
 	_, err := uuid.Parse(id)
@@ -83,6 +118,19 @@ func (h *BookingOrderHandler) UpdateBookingOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, bookingOrder)
 }
 
+// GetBookingOrderById godoc
+// @Summary Obtener booking order por ID
+// @Description Obtiene un registro de booking order por su ID
+// @Tags booking-order
+// @Accept json
+// @Produce json
+// @Param id path string true "ID del booking order"
+// @Success 200 {object} models.BookingOrder "Booking order encontrado"
+// @Failure 400 {object} map[string]string "ID inválido"
+// @Failure 404 {object} map[string]string "Booking order no encontrado"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /booking-order/{id} [get]
+// @Security BearerAuth
 func (h *BookingOrderHandler) GetBookingOrderById(c *gin.Context) {
 	id := c.Param("id")
 
@@ -106,6 +154,19 @@ func (h *BookingOrderHandler) GetBookingOrderById(c *gin.Context) {
 	c.JSON(http.StatusOK, bookingOrder)
 }
 
+// GetAllOrderForUserID godoc
+// @Summary Obtener todos los booking orders por ID de usuario
+// @Description Obtiene todos los registros de booking orders por ID de usuario
+// @Tags booking-order
+// @Accept json
+// @Produce json
+// @Param id path string true "ID del usuario"
+// @Success 200 {array} models.BookingOrder "Booking orders encontrados"
+// @Failure 400 {object} map[string]string "ID inválido"
+// @Failure 404 {object} map[string]string "Booking order no encontrado"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /booking-order/user/{id} [get]
+// @Security BearerAuth
 func (h *BookingOrderHandler) GetAllOrderForUserID(c *gin.Context) {
 	id := c.Param("id")
 

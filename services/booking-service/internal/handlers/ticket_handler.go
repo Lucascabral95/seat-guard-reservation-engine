@@ -30,6 +30,20 @@ func NewTicketHandler(
 	}
 }
 
+// GetTicketMetadata godoc
+// @Summary Obtener metadata del ticket
+// @Description Obtiene los datos del ticket sin el PDF binario
+// @Tags tickets
+// @Accept json
+// @Produce json
+// @Param orderID path string true "ID del order"
+// @Success 200 {object} map[string]interface{} "Metadata del ticket"
+// @Failure 400 {object} map[string]string "ID inválido"
+// @Failure 401 {object} map[string]string "No autenticado"
+// @Failure 403 {object} map[string]string "Acceso denegado"
+// @Failure 404 {object} map[string]string "Ticket no encontrado"
+// @Router /tickets/{orderID} [get]
+// @Security BearerAuth
 // GetTicketMetadata obtiene los datos del ticket sin el PDF binario
 // GET /api/v1/tickets/:orderID
 func (h *TicketHandler) GetTicketMetadata(c *gin.Context) {
@@ -75,17 +89,26 @@ func (h *TicketHandler) GetTicketMetadata(c *gin.Context) {
 	})
 }
 
+// DownloadTicketPDF godoc
+// @Summary Descargar PDF del ticket
+// @Description Genera y descarga el PDF del ticket
+// @Tags tickets
+// @Accept json
+// @Produce application/pdf
+// @Param orderID path string true "ID del order"
+// @Success 200 {file} file "PDF del ticket"
+// @Failure 400 {object} map[string]string "ID inválido"
+// @Failure 401 {object} map[string]string "No autenticado"
+// @Failure 403 {object} map[string]string "Acceso denegado"
+// @Failure 404 {object} map[string]string "Ticket no encontrado"
+// @Router /tickets/{orderID}/download [get]
+// @Security BearerAuth
 // DownloadTicketPDF genera y descarga el PDF del ticket
 // GET /api/v1/tickets/:orderID/download
 func (h *TicketHandler) DownloadTicketPDF(c *gin.Context) {
 	orderID := c.Param("orderID")
 
 	// Esto es para pedir Bearer token (JWT)
-	// _, exists := c.Get("userID")
-	// if !exists {
-	// 	c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-	// 	return
-	// }
 	ticket, err := h.ticketService.GetTicketByOrderID(orderID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Ticket not found"})
@@ -118,12 +141,25 @@ func (h *TicketHandler) DownloadTicketPDF(c *gin.Context) {
 	c.Data(http.StatusOK, "application/pdf", pdfBytes)
 }
 
+// RegenerateTicketPDF godoc
+// @Summary Regenerar PDF del ticket
+// @Description Regenera el PDF del ticket
+// @Tags tickets
+// @Accept json
+// @Produce application/pdf
+// @Param orderID path string true "ID del order"
+// @Success 200 {file} file "PDF del ticket"
+// @Failure 400 {object} map[string]string "ID inválido"
+// @Failure 401 {object} map[string]string "No autenticado"
+// @Failure 403 {object} map[string]string "Acceso denegado"
+// @Failure 404 {object} map[string]string "Ticket no encontrado"
+// @Router /tickets/{orderID}/regenerate [post]
+// @Security BearerAuth
 // RegenerateTicketPDF regenera el PDF de un ticket
 // POST /api/v1/tickets/:orderID/regenerate
 func (h *TicketHandler) RegenerateTicketPDF(c *gin.Context) {
 	orderID := c.Param("orderID")
 
-	// Obtener userID del JWT middleware
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
@@ -167,6 +203,16 @@ func (h *TicketHandler) RegenerateTicketPDF(c *gin.Context) {
 	})
 }
 
+// GetAllTickets godoc
+// @Summary Obtener todos los tickets
+// @Description Obtiene todos los tickets (solo admin)
+// @Tags tickets
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Lista de tickets"
+// @Failure 500 {object} map[string]string "Error interno"
+// @Router /tickets [get]
+// @Security BearerAuth
 // GetAllTickets obtiene todos los tickets (admin)
 // GET /api/v1/tickets
 func (h *TicketHandler) GetAllTickets(c *gin.Context) {
@@ -184,12 +230,24 @@ func (h *TicketHandler) GetAllTickets(c *gin.Context) {
 	})
 }
 
+// GetTicketByID godoc
+// @Summary Obtener ticket por ID
+// @Description Obtiene un ticket específico por su ID (solo owner o admin)
+// @Tags tickets
+// @Accept json
+// @Produce json
+// @Param ticketID path string true "ID del ticket"
+// @Success 200 {object} models.TicketPDF "Ticket encontrado"
+// @Failure 404 {object} map[string]string "Ticket no encontrado"
+// @Failure 403 {object} map[string]string "Acceso denegado"
+// @Failure 500 {object} map[string]string "Error interno"
+// @Router /tickets/by-id/{ticketID} [get]
+// @Security BearerAuth
 // GetTicketByID obtiene un ticket por su ID
 // GET /api/v1/tickets/by-id/:ticketID
 func (h *TicketHandler) GetTicketByID(c *gin.Context) {
 	ticketID := c.Param("ticketID")
 
-	// Obtener userID del JWT middleware
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
@@ -211,6 +269,19 @@ func (h *TicketHandler) GetTicketByID(c *gin.Context) {
 	c.JSON(http.StatusOK, ticket)
 }
 
+// DeleteTicket godoc
+// @Summary Eliminar ticket
+// @Description Elimina un ticket (soft delete) - solo owner o admin
+// @Tags tickets
+// @Accept json
+// @Produce json
+// @Param orderID path string true "ID del order"
+// @Success 200 {object} map[string]string "Ticket eliminado"
+// @Failure 404 {object} map[string]string "Ticket no encontrado"
+// @Failure 403 {object} map[string]string "Acceso denegado"
+// @Failure 500 {object} map[string]string "Error interno"
+// @Router /tickets/{orderID} [delete]
+// @Security BearerAuth
 // DeleteTicket elimina un ticket (soft delete)
 // DELETE /api/v1/tickets/:orderID
 func (h *TicketHandler) DeleteTicket(c *gin.Context) {
@@ -250,6 +321,20 @@ func (h *TicketHandler) DeleteTicket(c *gin.Context) {
 	})
 }
 
+// CreateTicketFromEndpoint godoc
+// @Summary Crear ticket desde endpoint
+// @Description Crea un ticket a partir de un order completado
+// @Tags tickets
+// @Accept json
+// @Produce json
+// @Param request body object true "Datos del ticket"
+// @Success 201 {object} models.TicketPDF "Ticket creado"
+// @Failure 400 {object} map[string]string "Datos inválidos"
+// @Failure 404 {object} map[string]string "Order no encontrado"
+// @Failure 409 {object} map[string]string "Ticket ya existe"
+// @Failure 500 {object} map[string]string "Error interno"
+// @Router /tickets [post]
+// @Security BearerAuth
 // Creacion de ticket desde endpoint
 // ✅ CÓDIGO CORRECTO
 func (h *TicketHandler) CreateTicketFromEndpoint(c *gin.Context) {
